@@ -1,0 +1,15 @@
+# SBI証券からダウンロードした取引データ。絶対にコミットしない
+sample-data/
+*.csv
+*.CSV
+
+# バックアップJSON（取引データを含む）
+trade-journal-*.json
+
+node_modules/
+dist/
+dev-dist/
+.DS_Store
+
+# 参考用に置いた他社アプリのスクリーンショット。公開リポジトリには入れない
+IMG_*.PNG
