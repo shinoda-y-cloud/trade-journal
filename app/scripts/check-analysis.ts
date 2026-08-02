@@ -103,5 +103,33 @@ eq('週前半の買い 差(pt)', +(wd.diff * 100).toFixed(1), -12.3, 0.1)
 eq('週前半の買い 生p', +wd.rawP.toFixed(4), 0.0075, 0.003)
 console.log(`  参考  最小の補正後p = ${Math.min(...rep.axes.map((a) => a.adjP)).toFixed(4)}（基準 0.01）`)
 
+
+/* ---- 勝ち方の構造（RRとエッジ） ---- */
+import { edgeStat } from '../src/lib/edge'
+
+console.log('\n=== RRとエッジ ===')
+const e = edgeStat(positions)
+eq('RR（平均利益÷平均損失）', +e.rr!.toFixed(3), 0.906, 0.002)
+eq('損益分岐に必要な勝率(%)', +(e.breakEven! * 100).toFixed(1), 52.5, 0.1)
+eq('エッジ(pt)', +(e.edge! * 100).toFixed(1), -3.8, 0.1)
+eq('平均利益', Math.round(e.avgWin), 2095, 1)
+eq('平均損失', Math.round(e.avgLoss), 2312, 1)
+eq('中央値ベースのRR', +e.rrMedian!.toFixed(2), 0.96, 0.02)
+eq('最大の勝ち', Math.round(e.maxWin), 35855, 1)
+eq('最大の負け', Math.round(e.maxLoss), 126506, 1)
+
+const byKey = (side: string, day: boolean) =>
+  edgeStat(positions.filter((p) => p.side === side && (p.holdingDays === 0) === day))
+const longOver = byKey('long', false)
+eq('買い・持ち越し 件数', longOver.n, 106)
+eq('買い・持ち越し 勝率(%)', +(longOver.winRate! * 100).toFixed(1), 57.1, 0.1)
+eq('買い・持ち越し RR', +longOver.rr!.toFixed(2), 0.31, 0.01)
+eq('買い・持ち越し 必要勝率(%)', +(longOver.breakEven! * 100).toFixed(1), 76.3, 0.2)
+eq('買い・持ち越し 損益', Math.round(longOver.pnl), -227033, 2)
+const shortDay = byKey('short', true)
+eq('空売り・デイトレ 件数', shortDay.n, 678)
+eq('空売り・デイトレ RR', +shortDay.rr!.toFixed(2), 1.19, 0.01)
+eq('空売り・デイトレ 損益', Math.round(shortDay.pnl), 5459, 2)
+
 console.log(`\n${failed === 0 ? '✅ すべて一致' : `❌ ${failed}件が不一致`}`)
 process.exit(failed === 0 ? 0 : 1)

@@ -40,6 +40,7 @@ import type { Position } from '../lib/sbi/types'
 import { HBars, Histogram, MagnitudeBars, PnlBars, PolarityLegend, Waterfall } from '../components/charts'
 import { Card, Footnote, StatsTable } from '../components/ui'
 import { TradeTable } from '../components/TradeTable'
+import { EdgeSection } from './EdgeSection'
 
 /* ------------------------------------------------------------------ */
 
@@ -170,6 +171,9 @@ export function AnalysisView({ positions }: { positions: Position[] }) {
 
   return (
     <div className="grid" style={{ gap: 14 }}>
+      {/* ---------------------------------------------------------- */}
+      <EdgeSection positions={positions} />
+
       {/* ---------------------------------------------------------- */}
       <Card title="この期間について確かに言えること" desc="検定を必要としない、数え上げるだけで確かめられる事実">
         <div style={{ display: 'grid', gap: 18 }}>

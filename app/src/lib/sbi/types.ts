@@ -110,6 +110,12 @@ export interface Position {
   fee: number
   /** 実現損益（諸経費控除後） */
   realizedPnl: number
+  /**
+   * 損益が元CSVから判明しているか。
+   * 約定履歴CSVだけを取り込むと現物・投信の決済に損益が入らず、
+   * 0として集計されてしまう。それを検知して警告するためのフラグ。
+   */
+  pnlKnown: boolean
 }
 
 /** 取り込み結果のサマリ */

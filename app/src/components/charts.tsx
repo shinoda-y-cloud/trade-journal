@@ -273,7 +273,14 @@ export interface HBarDatum extends BarDatum {
   sub?: string
 }
 
-export function HBars({ data }: { data: HBarDatum[] }) {
+export function HBars({
+  data,
+  format = signedYen,
+}: {
+  data: HBarDatum[]
+  /** 値ラベルの整形。既定は円表記 */
+  format?: (v: number) => string
+}) {
   const [ref, width] = useWidth<HTMLDivElement>()
   if (data.length === 0) return <div ref={ref} />
 
@@ -307,7 +314,7 @@ export function HBars({ data }: { data: HBarDatum[] }) {
                 </div>
               )}
             </div>
-            <svg width="100%" height={20} role="img" aria-label={`${d.label} ${signedYen(d.value)}`}>
+            <svg width="100%" height={20} role="img" aria-label={`${d.label} ${format(d.value)}`}>
               <line x1={zero} x2={zero} y1={0} y2={20} stroke="var(--axis)" strokeWidth={1} />
               <rect x={positive ? zero : zero - w} y={3} width={w} height={14} rx={4} fill={positive ? 'var(--pos)' : 'var(--neg)'} />
             </svg>
@@ -320,7 +327,7 @@ export function HBars({ data }: { data: HBarDatum[] }) {
                 color: positive ? 'var(--pos)' : 'var(--neg)',
               }}
             >
-              {signedYen(d.value)}
+              {format(d.value)}
             </div>
           </div>
         )

@@ -79,6 +79,7 @@ export function buildPositions(executions: Execution[]): BuildPositionsResult {
       if (lot.quantity === 0) book.shift()
     }
 
+    const pnlKnown = e.realizedPnl !== null
     const pnl = e.realizedPnl ?? 0
     // 決済側の手数料（信用の金利・貸株料を含む）も1株あたりに割って配る
     const closeFeePerUnit = e.quantity === 0 ? 0 : e.fee / e.quantity
@@ -102,6 +103,7 @@ export function buildPositions(executions: Execution[]): BuildPositionsResult {
         closePrice: e.price,
         fee: closeFeePerUnit * remaining,
         realizedPnl: pnl * (remaining / e.quantity),
+        pnlKnown,
       })
     }
 
@@ -123,6 +125,7 @@ export function buildPositions(executions: Execution[]): BuildPositionsResult {
         closePrice: e.price,
         fee: (lot.feePerUnit + closeFeePerUnit) * qty,
         realizedPnl: pnl * share,
+        pnlKnown,
       })
     }
   }

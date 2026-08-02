@@ -63,7 +63,7 @@ const TABS: TabMeta[] = [
   {
     id: 'analysis',
     label: '分析',
-    desc: '保有期間・方向・曜日など、切り口別の成績',
+    desc: 'RRとエッジで、どこで勝ててどこで負けているかを見る',
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" {...stroke}>
         <circle cx="12" cy="12" r="9" />
@@ -129,6 +129,9 @@ export default function App() {
     [allPositions, rangeKey, full],
   )
 
+  // 損益不明の建玉。約定履歴CSVだけを取り込むと現物・投信がここに落ちる
+  const unknownPnl = useMemo(() => allPositions.filter((p) => !p.pnlKnown), [allPositions])
+
   const hasData = allPositions.length > 0
   // データが無いうちは取り込み画面に固定する
   const active: Tab = executions !== null && !hasData ? 'data' : tab
@@ -161,6 +164,26 @@ export default function App() {
           </div>
           {showRange && <Segmented options={RANGES} value={rangeKey} onChange={setRangeKey} />}
         </div>
+
+        {unknownPnl.length > 0 && active !== 'data' && (
+          <div
+            style={{
+              padding: '13px 16px',
+              marginBottom: 14,
+              borderRadius: 12,
+              background: 'color-mix(in srgb, var(--series-2) 12%, var(--surface))',
+              border: '1px solid color-mix(in srgb, var(--series-2) 45%, transparent)',
+              fontSize: 12.5,
+              lineHeight: 1.75,
+            }}
+          >
+            <b>損益が0のまま集計されている決済が {unknownPnl.length} 件あります。</b>
+            <br />
+            「約定履歴照会」のCSVには現物・投資信託・米国株の損益が入っていません。
+            <b>実現損益（譲渡益税明細）のCSVも一緒に取り込んでください。</b>
+            取り込むまで、合計損益・勝率・RRはいずれも正しくありません。
+          </div>
+        )}
 
         {executions === null ? (
           <div className="empty">読み込み中…</div>
