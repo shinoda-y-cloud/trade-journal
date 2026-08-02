@@ -78,9 +78,16 @@ export function Segmented<T extends string>({
   )
 }
 
+/** これ未満の件数では勝率などを確定的に読まない */
+export const REFERENCE_N = 30
+
 /**
  * 内訳の表。グラフで色分けした情報を必ず文字でも読めるようにするための
  * テーブルビューを兼ねる（アクセシビリティ上の必須要件）。
+ *
+ * 件数が {@link REFERENCE_N} 未満の行は勝率を灰色にして「参考」と付ける。
+ * n=1 で「勝率100%」と黒字で出すと、確かめられていないことを
+ * 確かめたように見せてしまうため。
  */
 export function StatsTable({
   rows,
@@ -89,6 +96,7 @@ export function StatsTable({
   rows: (Group<unknown> & { name?: string })[]
   firstColumn?: string
 }) {
+  const thin = rows.some((r) => r.stats.trades < REFERENCE_N)
   return (
     <div className="table-wrap">
       <table className="data">
@@ -118,7 +126,12 @@ export function StatsTable({
                 )}
               </td>
               <td>{r.stats.trades.toLocaleString('ja-JP')}</td>
-              <td>{percent(winRate(r.stats), 0)}</td>
+              <td style={r.stats.trades < REFERENCE_N ? { color: 'var(--ink-muted)' } : undefined}>
+                {percent(winRate(r.stats), 0)}
+                {r.stats.trades < REFERENCE_N && (
+                  <span style={{ fontSize: 10, marginLeft: 5, opacity: 0.85 }}>参考</span>
+                )}
+              </td>
               <td>{r.stats.wins ? yen(avgWin(r.stats) ?? 0) : '—'}</td>
               <td>{r.stats.losses ? `-${yen(avgLoss(r.stats) ?? 0)}` : '—'}</td>
               <td>{ratio(profitFactor(r.stats))}</td>
@@ -130,6 +143,11 @@ export function StatsTable({
           ))}
         </tbody>
       </table>
+      {thin && (
+        <p className="note" style={{ margin: '12px 0 0' }}>
+          「参考」は決済{REFERENCE_N}回未満の行です。勝率は数回の結果で大きく振れるため、確定的な数字としては読めません。
+        </p>
+      )}
     </div>
   )
 }

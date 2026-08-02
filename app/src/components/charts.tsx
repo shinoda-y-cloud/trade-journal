@@ -13,16 +13,22 @@ import { compactYen, shortDate, signedYen } from '../lib/format'
 
 /* ------------------------------------------------------------------ */
 
-/** 親要素の幅に追従させる */
+/**
+ * 親要素の幅に追従させる。
+ *
+ * 1px未満の変化では state を更新しない。棒の位置や列幅を幅から計算している
+ * 部品があるため、微小な差で再測定→再描画が往復すると止まらなくなる。
+ */
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null)
   const [w, setW] = useState(0)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => setW(entry.contentRect.width))
+    const apply = (next: number) => setW((prev) => (Math.abs(prev - next) < 1 ? prev : Math.round(next)))
+    const ro = new ResizeObserver(([entry]) => apply(entry.contentRect.width))
     ro.observe(el)
-    setW(el.clientWidth)
+    apply(el.clientWidth)
     return () => ro.disconnect()
   }, [])
   return [ref, w] as const
@@ -177,7 +183,8 @@ export function PnlBars({ data, height = 240 }: { data: BarDatum[]; height?: num
   const [ref, width] = useWidth<HTMLDivElement>()
   const [hover, setHover] = useState<number | null>(null)
 
-  const pad = { top: 14, right: 12, bottom: 30, left: 56 }
+  // 下向きの棒に付く数値ラベルが軸ラベルと重ならないよう、下の余白を広く取る
+  const pad = { top: 18, right: 12, bottom: 46, left: 56 }
   const iw = Math.max(width - pad.left - pad.right, 10)
   const ih = height - pad.top - pad.bottom
 
@@ -225,7 +232,7 @@ export function PnlBars({ data, height = 240 }: { data: BarDatum[]; height?: num
                 {labelled.has(i) && (
                   <text
                     x={x + bw / 2}
-                    y={d.value >= 0 ? y - 7 : y + 15}
+                    y={d.value >= 0 ? Math.max(y - 7, -6) : Math.min(y + 15, ih + 15)}
                     textAnchor="middle"
                     fontSize={11}
                     fontWeight={600}
@@ -241,7 +248,7 @@ export function PnlBars({ data, height = 240 }: { data: BarDatum[]; height?: num
 
           {data.map((d, i) =>
             data.length <= 14 || i % Math.ceil(data.length / 10) === 0 ? (
-              <text key={d.key} x={i * band + band / 2} y={ih + 19} textAnchor="middle" fontSize={10.5} fill="var(--ink-muted)">
+              <text key={d.key} x={i * band + band / 2} y={ih + 35} textAnchor="middle" fontSize={10.5} fill="var(--ink-muted)">
                 {d.label}
               </text>
             ) : null,
@@ -343,4 +350,224 @@ export function useMounted() {
   const [m, setM] = useState(false)
   useEffect(() => setM(true), [])
   return m
+}
+
+/* ------------------------------------------------------------------ */
+/* ウォーターフォール（総利益・総損失・純損益の関係）                   */
+/* ------------------------------------------------------------------ */
+
+export function Waterfall({
+  grossProfit,
+  grossLoss,
+  height = 220,
+}: {
+  grossProfit: number
+  grossLoss: number
+  height?: number
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>()
+  const net = grossProfit + grossLoss
+
+  const pad = { top: 26, right: 12, bottom: 34, left: 62 }
+  const iw = Math.max(width - pad.left - pad.right, 10)
+  const ih = height - pad.top - pad.bottom
+
+  const lo = Math.min(0, net, grossLoss + grossProfit)
+  const hi = Math.max(0, grossProfit)
+  const ticks = niceTicks(lo, hi)
+  const yMin = Math.min(lo, ticks[0])
+  const yMax = Math.max(hi, ticks[ticks.length - 1])
+  const Y = (v: number) => ih - ((v - yMin) / (yMax - yMin || 1)) * ih
+
+  // 総利益を積み上げ、そこから総損失を引き、残りが純損益
+  const bars = [
+    { label: '総利益', from: 0, to: grossProfit, color: 'var(--pos)', value: grossProfit },
+    { label: '総損失', from: grossProfit, to: net, color: 'var(--neg)', value: grossLoss },
+    { label: '純損益', from: 0, to: net, color: net >= 0 ? 'var(--pos)' : 'var(--neg)', value: net },
+  ]
+  const band = iw / bars.length
+  const bw = Math.max(Math.min(band - 2, 72), 2)
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <svg width="100%" height={height} role="img" aria-label="総利益と総損失の差し引き">
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={0} x2={iw} y1={Y(t)} y2={Y(t)} stroke="var(--grid)" strokeWidth={1} />
+              <text x={-10} y={Y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--ink-muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {compactYen(t)}
+              </text>
+            </g>
+          ))}
+          <line x1={0} x2={iw} y1={Y(0)} y2={Y(0)} stroke="var(--axis)" strokeWidth={1} />
+
+          {bars.map((b, i) => {
+            const x = i * band + (band - bw) / 2
+            const top = Math.min(Y(b.from), Y(b.to))
+            const h = Math.max(Math.abs(Y(b.to) - Y(b.from)), 2)
+            return (
+              <g key={b.label}>
+                <rect x={x} y={top} width={bw} height={h} rx={4} fill={b.color} />
+                <text
+                  x={x + bw / 2}
+                  y={top - 8}
+                  textAnchor="middle"
+                  fontSize={11.5}
+                  fontWeight={600}
+                  fill="var(--ink-2)"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {signedYen(b.value)}
+                </text>
+                <text x={x + bw / 2} y={ih + 20} textAnchor="middle" fontSize={11.5} fill="var(--ink-muted)">
+                  {b.label}
+                </text>
+              </g>
+            )
+          })}
+
+          {/* 総利益の頭と総損失の始点を結ぶ補助線 */}
+          <line
+            x1={band / 2 + bw / 2}
+            x2={band + (band - bw) / 2}
+            y1={Y(grossProfit)}
+            y2={Y(grossProfit)}
+            stroke="var(--axis)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <line
+            x1={band + band / 2 + bw / 2 - bw / 2}
+            x2={2 * band + (band - bw) / 2}
+            y1={Y(net)}
+            y2={Y(net)}
+            stroke="var(--axis)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 大きさだけを表す棒（極性を持たない量）                               */
+/* ------------------------------------------------------------------ */
+
+export interface MagnitudeDatum {
+  key: string
+  label: string
+  value: number
+  /** 棒の先に出す文字。省略すると値をそのまま出す */
+  display?: string
+}
+
+/**
+ * 標準偏差や発生率のように「符号を持たない大きさ」を表す横棒。
+ * 損益の青赤とは別の色相を使い、極性のある量と取り違えられないようにする。
+ */
+export function MagnitudeBars({ data, unit = '' }: { data: MagnitudeDatum[]; unit?: string }) {
+  const [ref, width] = useWidth<HTMLDivElement>()
+  if (data.length === 0) return <div ref={ref} />
+
+  const labelW = Math.round(Math.min(Math.max(width * 0.28, 92), 180))
+  const valueW = 84
+  const track = Math.max(width - labelW - valueW - 16, 40)
+  const span = Math.max(...data.map((d) => d.value), 1e-9)
+
+  return (
+    <div ref={ref} style={{ display: 'grid', gap: 8 }}>
+      {data.map((d) => (
+        <div key={d.key} style={{ display: 'grid', gridTemplateColumns: `${labelW}px 1fr ${valueW}px`, alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {d.label}
+          </div>
+          <svg width="100%" height={20} role="img" aria-label={`${d.label} ${d.display ?? d.value}${unit}`}>
+            <line x1={0} x2={0} y1={0} y2={20} stroke="var(--axis)" strokeWidth={1} />
+            <rect x={0} y={3} width={Math.max((d.value / span) * track, 2)} height={14} rx={4} fill="var(--series-2)" />
+          </svg>
+          <div style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>
+            {d.display ?? d.value.toLocaleString('ja-JP')}
+            {unit}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* ヒストグラム                                                        */
+/* ------------------------------------------------------------------ */
+
+export function Histogram({
+  values,
+  bins = 24,
+  height = 170,
+  format = (v: number) => compactYen(v),
+  markers = [],
+}: {
+  values: number[]
+  bins?: number
+  height?: number
+  format?: (v: number) => string
+  markers?: { value: number; label: string }[]
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>()
+  const pad = { top: 12, right: 12, bottom: 30, left: 34 }
+  const iw = Math.max(width - pad.left - pad.right, 10)
+  const ih = height - pad.top - pad.bottom
+
+  if (values.length === 0) return <div ref={ref} style={{ height }} />
+
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const w = (hi - lo) / bins || 1
+  const counts = new Array(bins).fill(0)
+  for (const v of values) counts[Math.min(Math.floor((v - lo) / w), bins - 1)]++
+  const peak = Math.max(...counts, 1)
+
+  const X = (v: number) => ((v - lo) / (hi - lo || 1)) * iw
+  const bw = Math.max(iw / bins - 2, 1)
+
+  return (
+    <div ref={ref}>
+      <svg width="100%" height={height} role="img" aria-label="建玉金額の分布">
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          <line x1={0} x2={iw} y1={ih} y2={ih} stroke="var(--axis)" strokeWidth={1} />
+          {counts.map((c, i) => (
+            <rect
+              key={i}
+              x={(i * iw) / bins + 1}
+              y={ih - (c / peak) * ih}
+              width={bw}
+              height={Math.max((c / peak) * ih, c > 0 ? 1.5 : 0)}
+              rx={3}
+              fill="var(--series-2)"
+              opacity={0.85}
+            />
+          ))}
+          {markers.map((m) => (
+            <g key={m.label}>
+              <line x1={X(m.value)} x2={X(m.value)} y1={0} y2={ih} stroke="var(--ink-2)" strokeWidth={1} strokeDasharray="3 3" />
+              <text x={X(m.value)} y={-1} textAnchor="middle" fontSize={10} fill="var(--ink-muted)">
+                {m.label}
+              </text>
+            </g>
+          ))}
+          <text x={0} y={ih + 18} fontSize={10.5} fill="var(--ink-muted)">
+            {format(lo)}
+          </text>
+          <text x={iw} y={ih + 18} textAnchor="end" fontSize={10.5} fill="var(--ink-muted)">
+            {format(hi)}
+          </text>
+          <text x={-8} y={4} textAnchor="end" fontSize={10} fill="var(--ink-muted)">
+            {peak}
+          </text>
+        </g>
+      </svg>
+    </div>
+  )
 }
