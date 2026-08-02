@@ -180,12 +180,9 @@ export default function App() {
         ) : active === 'dashboard' ? (
           <Dashboard positions={positions} />
         ) : active === 'calendar' ? (
-          // セルが間延びしないよう横幅に上限を置く
-          <div style={{ maxWidth: 760 }}>
-            <Card>
-              <PnlCalendar positions={allPositions} />
-            </Card>
-          </div>
+          <Card>
+            <PnlCalendar positions={allPositions} />
+          </Card>
         ) : active === 'symbols' ? (
           <SymbolsView positions={positions} />
         ) : (

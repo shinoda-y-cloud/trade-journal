@@ -6,8 +6,10 @@
  * 取引があった日には必ず金額を文字でも表示する。
  */
 import { useMemo, useState } from 'react'
-import { compactYen, longDate, signedYen } from '../lib/format'
+import { compactYen, longDate } from '../lib/format'
+import { signedYen } from '../lib/format'
 import type { Position } from '../lib/sbi/types'
+import { TradeSummary, TradeTable } from './TradeTable'
 
 const WEEK = ['月', '火', '水', '木', '金', '土', '日']
 
@@ -38,6 +40,12 @@ export function PnlCalendar({ positions }: { positions: Position[] }) {
 
   const [cursor, setCursor] = useState(() => months[months.length - 1] ?? '')
   const [picked, setPicked] = useState<DayCell | null>(null)
+
+  // 選択日の建玉。日付が変わるたびに絞り込む
+  const dayPositions = useMemo(
+    () => (picked ? positions.filter((p) => p.closeDate === picked.date) : []),
+    [positions, picked],
+  )
 
   if (months.length === 0) return null
   const month = months.includes(cursor) ? cursor : months[months.length - 1]
@@ -78,6 +86,7 @@ export function PnlCalendar({ positions }: { positions: Position[] }) {
 
   return (
     <div>
+      <div style={{ maxWidth: 760 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
         <div>
           <h2 style={{ fontSize: 15 }}>
@@ -153,19 +162,27 @@ export function PnlCalendar({ positions }: { positions: Position[] }) {
           ),
         )}
       </div>
+      </div>
 
       {picked && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--grid)' }}>
-          <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 4 }}>{longDate(picked.date)}</div>
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--grid)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: 14 }}>{longDate(picked.date)}</h3>
+            <button
+              className="btn"
+              onClick={() => setPicked(null)}
+              style={{ padding: '5px 11px', fontSize: 12 }}
+            >
+              閉じる
+            </button>
+          </div>
           {picked.pnl === null ? (
-            <div style={{ fontSize: 14, color: 'var(--ink-2)' }}>取引はありません</div>
+            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 10 }}>この日の決済はありません。</div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-              <span className={picked.pnl >= 0 ? 'pos' : 'neg'} style={{ fontSize: 22, fontWeight: 640, letterSpacing: '-0.02em' }}>
-                {signedYen(picked.pnl)}
-              </span>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-muted)' }}>{picked.trades}回の決済</span>
-            </div>
+            <>
+              <TradeSummary positions={dayPositions} />
+              <TradeTable positions={dayPositions} />
+            </>
           )}
         </div>
       )}

@@ -1,0 +1,13 @@
+import { loadAll } from '../_load'
+const { positions, executions } = loadAll()
+console.log('exec', executions.length, 'pos', positions.length)
+const m = new Map<string, number>()
+for (const e of executions) m.set(String(e.market), (m.get(String(e.market)) ?? 0) + 1)
+console.log('--- market counts ---')
+for (const [k, v] of [...m].sort((a,b)=>b[1]-a[1])) console.log(k, v)
+const byKind = new Map<string, number>()
+for (const e of executions) byKind.set(`${e.market}|${e.kind}|${e.action}`, (byKind.get(`${e.market}|${e.kind}|${e.action}`) ?? 0) + 1)
+console.log('--- market|kind|action ---')
+for (const [k,v] of [...byKind].sort((a,b)=>b[1]-a[1])) console.log(k, v)
+console.log('--- pnl total ---', positions.reduce((s,p)=>s+p.realizedPnl,0))
+console.log('sample PTS exec', executions.filter(e=>String(e.market).startsWith('PTS')).slice(0,3))
