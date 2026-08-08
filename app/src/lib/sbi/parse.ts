@@ -1,12 +1,12 @@
 /**
  * SBI証券のCSVを Execution[] に変換する。
  *
- * 対応する2形式:
- *   1. 約定履歴照会      … 全取引（新規・返済の両方）。主データ
- *   2. 実現損益(譲渡益税) … 現物・投信・米国株の損益。1の補完に使う
+ * 対応する3形式:
+ *   1. 約定履歴照会        … 全取引（新規・返済の両方）。主データ
+ *   2. 実現損益(譲渡益税)   … 商品ごとに分かれた損益。1の補完に使う
+ *   3. 特定口座損益明細     … 現物と信用の損益が1ファイルに入る。2の代わりになる
  *
- * どちらもヘッダー位置がファイル種別ごとに異なるため、
- * 「1列目が『約定日』の行」を明細ヘッダーとして動的に検出する。
+ * いずれもヘッダー位置がファイルごとに違うため、明細ヘッダー行を動的に検出する。
  */
 import { decodeSbiCsv, parseCsv, toIsoDate, toNumber, toNumberOr0 } from './csv'
 import type {
@@ -39,8 +39,18 @@ function findHeaderIndex(rows: string[][]): number {
   return rows.findIndex((r) => r.length > 3 && r[0]?.trim() === '約定日')
 }
 
+/** 特定口座損益明細のヘッダー行（1列目が「銘柄コード」）を探す */
+function findSettlementHeaderIndex(rows: string[][]): number {
+  return rows.findIndex((r) => r.length > 5 && r[0]?.trim() === '銘柄コード')
+}
+
 /** ファイル形式を判定する */
 export function detectFormat(rows: string[][]): SbiFormat {
+  const si = findSettlementHeaderIndex(rows)
+  if (si >= 0) {
+    const h = rows[si].map((c) => c.trim())
+    if (h.includes('損益金額/徴収額') && h.includes('取得/新規年月日')) return 'settlement_detail'
+  }
   const hi = findHeaderIndex(rows)
   if (hi < 0) return 'unknown'
   const header = rows[hi].map((c) => c.trim())
@@ -214,6 +224,84 @@ export function parseRealizedPnl(rows: string[][]): {
 }
 
 /* ------------------------------------------------------------------ */
+/* 3. 特定口座損益明細                                                  */
+/* ------------------------------------------------------------------ */
+
+/** 「現物売」「信用返済売」「信用返済買」→ 内部表現 */
+const SETTLEMENT_KIND_MAP: Record<string, { kind: TradeKind; side: Side }> = {
+  現物売: { kind: 'cash', side: 'long' },
+  信用返済売: { kind: 'margin', side: 'long' },
+  信用返済買: { kind: 'margin', side: 'short' },
+}
+
+/**
+ * 特定口座損益明細を実現損益として読む。
+ *
+ * この形式は現物と信用の決済損益が1ファイルにまとまっており、
+ * 商品ごとに分かれた「実現損益」CSVの代わりになる。
+ * ただし特定口座のみなので、NISA・米国株・投資信託は含まれない。
+ *
+ * 明細行のあいだに「譲渡益税徴収額」「譲渡益税還付金」の行が挟まる。
+ * どちらも取引が空なので、それで除外する。
+ *
+ * なお「取得/新規年月日」は取得側の受渡日で、約定日とは基準が違うため
+ * 保有期間の算出には使わない（保有期間は約定履歴のFIFO突合で出す）。
+ */
+export function parseSettlementDetail(rows: string[][]): {
+  realized: RealizedRow[]
+  warnings: string[]
+} {
+  const warnings: string[] = []
+  const hi = findSettlementHeaderIndex(rows)
+  const idx = indexOfHeader(rows[hi])
+  const get = (r: string[], key: string) => r[idx[key]]?.trim() ?? ''
+
+  const realized: RealizedRow[] = []
+  const unknownKinds = new Set<string>()
+
+  for (const r of rows.slice(hi + 1)) {
+    if (r.length < 12) continue
+    const rawKind = get(r, '取引')
+    if (!rawKind) continue // 譲渡益税徴収額・還付金の行
+    const date = toIsoDate(get(r, '約定日'))
+    if (date === null) continue
+
+    const mapped = SETTLEMENT_KIND_MAP[rawKind]
+    if (!mapped) {
+      unknownKinds.add(rawKind)
+      continue
+    }
+
+    // 数量は「100株」のように単位が付く
+    const quantity = toNumberOr0(get(r, '数量').replace(/[^0-9.-]/g, ''))
+    const amount = toNumberOr0(get(r, '売却/決済金額'))
+    // 損益が「--」の行は同値決済（±0）。読み飛ばすと決済が1件欠ける
+    const pnl = toNumberOr0(get(r, '損益金額/徴収額'))
+
+    realized.push({
+      date,
+      account: '特定',
+      code: get(r, '銘柄コード'),
+      name: get(r, '銘柄'),
+      assetClass: 'domestic_stock',
+      kind: mapped.kind,
+      side: mapped.side,
+      rawKind,
+      quantity,
+      // 突合キーに単価を使うので、金額と数量から戻す
+      price: quantity ? amount / quantity : 0,
+      avgCost: 0,
+      realizedPnl: pnl,
+    })
+  }
+
+  if (unknownKinds.size > 0) {
+    warnings.push(`未対応の取引種別をスキップしました: ${[...unknownKinds].join(', ')}`)
+  }
+  return { realized, warnings }
+}
+
+/* ------------------------------------------------------------------ */
 /* 重複排除                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -263,7 +351,7 @@ export function dedupeExecutions(executions: Execution[]): Execution[] {
 export function mergeRealizedPnl(
   executions: Execution[],
   realized: RealizedRow[],
-): { merged: number; synthesized: Execution[]; unmatched: RealizedRow[] } {
+): { merged: number; synthesized: Execution[]; duplicated: number; unmatched: RealizedRow[] } {
   const pool = new Map<string, RealizedRow[]>()
   for (const r of realized) {
     // 信用返済の損益は約定履歴側が正。突合対象から外す
@@ -286,18 +374,26 @@ export function mergeRealizedPnl(
     merged++
   }
 
-  // 残った行＝約定履歴に対応が無いもの（実質的に米国株）。決済レコードとして合成する
+  // 残った行のうち、その日・その銘柄の決済約定が約定履歴に一切無いものだけを合成する。
+  // 決済約定が存在するのに余っている行は、別形式の同じ損益が二重に入っているだけなので捨てる
+  // （実現損益CSVと特定口座損益明細を両方選んだ場合に起きる）。
+  const closedDayCode = new Set(
+    executions.filter((e) => e.action === 'close').map((e) => `${e.date}|${e.code}`),
+  )
   const leftover = [...pool.values()].flat()
+  const duplicated = leftover.filter((r) => closedDayCode.has(`${r.date}|${r.code}`))
   const seq = new Map<string, number>()
-  const synthesized = leftover.map((r) => {
-    const base = joinKey(r.date, r.code, r.quantity, r.price)
-    const n = (seq.get(base) ?? 0) + 1
-    seq.set(base, n)
-    return toSyntheticExecution(r, n)
-  })
+  const synthesized = leftover
+    .filter((r) => !closedDayCode.has(`${r.date}|${r.code}`))
+    .map((r) => {
+      const base = joinKey(r.date, r.code, r.quantity, r.price)
+      const n = (seq.get(base) ?? 0) + 1
+      seq.set(base, n)
+      return toSyntheticExecution(r, n)
+    })
   executions.push(...synthesized)
 
-  return { merged, synthesized, unmatched: [] }
+  return { merged, synthesized, duplicated: duplicated.length, unmatched: [] }
 }
 
 /** 約定履歴に存在しない実現損益行から、決済レコードを組み立てる */
@@ -365,6 +461,10 @@ export function parseSbiFile(buf: ArrayBuffer): ParsedFile {
   }
   if (format === 'realized_pnl') {
     const { realized, warnings } = parseRealizedPnl(rows)
+    return { format, executions: [], realized, warnings }
+  }
+  if (format === 'settlement_detail') {
+    const { realized, warnings } = parseSettlementDetail(rows)
     return { format, executions: [], realized, warnings }
   }
   return {

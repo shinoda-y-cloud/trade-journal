@@ -17,6 +17,7 @@ import { longDate } from '../lib/format'
 const FORMAT_LABEL: Record<string, string> = {
   execution_history: '約定履歴照会',
   realized_pnl: '実現損益',
+  settlement_detail: '特定口座損益明細',
   unknown: '不明',
 }
 
@@ -83,9 +84,12 @@ export function DataView({
       executions.length = 0
       executions.push(...unique)
 
-      const { merged, synthesized } = mergeRealizedPnl(executions, realized)
+      const { merged, synthesized, duplicated } = mergeRealizedPnl(executions, realized)
       if (merged > 0) lines.push(`実現損益を${merged}件の決済に突き合わせました`)
       if (synthesized.length > 0) lines.push(`約定履歴に無い決済を${synthesized.length}件補完しました`)
+      if (duplicated > 0) {
+        lines.push(`同じ損益が複数のファイルに入っていた${duplicated}件は無視しました（二重計上を防ぐため）`)
+      }
 
       const res = await saveExecutions(executions)
       lines.push(`保存：新規${res.added}件 / 既存と重複${res.duplicated}件`)

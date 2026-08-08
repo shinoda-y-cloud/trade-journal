@@ -126,4 +126,4 @@ export interface ImportResult {
   warnings: string[]
 }
 
-export type SbiFormat = 'execution_history' | 'realized_pnl' | 'unknown'
+export type SbiFormat = 'execution_history' | 'realized_pnl' | 'settlement_detail' | 'unknown'

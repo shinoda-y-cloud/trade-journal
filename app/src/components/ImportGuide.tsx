@@ -214,6 +214,13 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
             下のバックアップを定期的に書き出しておいてください。
           </div>
 
+          <div className="note" style={{ marginTop: 10, lineHeight: 1.8 }}>
+            <b style={{ color: 'var(--ink-2)' }}>補足：</b>
+            「特定口座損益明細」（<code>SaveFile_</code> で始まるが中身が損益明細のもの）を落とせば、
+            現物と信用の損益が1ファイルにまとまっているので、下の「譲渡益税明細（国内株式）」の代わりになります。
+            商品指定を切り替える手間が省けます。両方入れても二重計上はしません。
+          </div>
+
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             {FILE_KINDS.map((k) => {
               const last = lastOf(k.key)
