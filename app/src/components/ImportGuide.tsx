@@ -21,49 +21,91 @@ const KEY = {
 } as const
 
 /**
- * 落とすべきCSVの種類。判別はファイル名の接頭辞で行う。
+ * 落とすべきCSVの種類。
  *
- * バッジは「取引履歴」ボタンを押した先に並ぶタブ名
- * （約定履歴 / 信用決済明細 / 譲渡益税明細 / カバードワラント損益）に対応する。
+ * 「約定履歴」と「特定口座損益明細」はどちらもファイル名が SaveFile_ で始まるため、
+ * ファイル名だけでは区別できない。取り込み時に判定した形式（ImportLog.format）を
+ * 優先して照合し、それが使えないものだけファイル名の接頭辞で見る。
+ *
+ * バッジは「取引履歴」ボタンを押した先のタブ名。
  */
-const FILE_KINDS = [
+type Need = 'required' | 'either' | 'optional'
+
+interface FileKind {
+  id: string
+  /** 取り込み履歴の形式ラベルで照合する */
+  format?: string
+  /** ファイル名の接頭辞で照合する */
+  prefix?: string
+  menu: string
+  label: string
+  need: Need
+  /** どちらか一方でよい組の中で、こちらを勧める */
+  recommended?: boolean
+  what: string
+  why: string
+  file: string
+}
+
+const FILE_KINDS: FileKind[] = [
   {
-    key: 'SaveFile_',
+    id: 'exec',
+    format: '約定履歴照会',
     menu: '約定履歴',
     label: '約定履歴照会',
-    required: true,
+    need: 'required',
     what: '全取引（新規建て・返済の両方）が入った主データ',
     why: 'これが無いと保有期間もエントリー価格も分かりません',
-    file: 'SaveFile_000001_003081.csv のような名前',
+    file: 'SaveFile_000001_003224.csv のような名前',
   },
   {
-    key: 'DOMESTIC_STOCK_',
+    id: 'settlement',
+    format: '特定口座損益明細',
+    menu: '譲渡益税明細',
+    label: '特定口座損益明細',
+    need: 'either',
+    recommended: true,
+    what: '現物と信用の損益が1ファイルに入っています',
+    why: '商品指定を切り替える必要がなく、1回で済みます。ファイル名は約定履歴と同じ SaveFile_ で始まりますが、中身が違うので取り込めば自動で判別されます',
+    file: 'SaveFile_000001_001660.csv のような名前',
+  },
+  {
+    id: 'domestic',
+    prefix: 'DOMESTIC_STOCK_',
     menu: '譲渡益税明細',
     label: '国内株式',
-    required: true,
+    need: 'either',
     what: '現物取引の損益',
-    why: '約定履歴には現物の損益が入っていないため、これが無いと損益が0で集計されます。商品指定は必ず「株式現物」に切り替えてください。初期値の「株式信用」で落としても、その中身は約定履歴と重複しているだけで新しい情報はありません',
+    why: '上の特定口座損益明細を落とすならこちらは不要です。こちらを使う場合は、商品指定を必ず「株式現物」に切り替えてください（初期値の「株式信用」は約定履歴と重複するだけです）',
     file: 'DOMESTIC_STOCK_20260802023656.csv のような名前',
   },
   {
-    key: 'FOREIGN_STOCK_',
+    id: 'foreign',
+    prefix: 'FOREIGN_STOCK_',
     menu: '譲渡益税明細',
     label: '米国株式',
-    required: false,
+    need: 'optional',
     what: '米国株の損益',
-    why: '米国株は約定履歴に一切現れないため、これが唯一のデータ源です',
+    why: '米国株は約定履歴に一切現れないため、これが唯一のデータ源です。一度取り込めば残るので、新しく売買しない限り再取得は不要です',
     file: 'FOREIGN_STOCK_20260802023740.csv のような名前',
   },
   {
-    key: 'FUND_',
+    id: 'fund',
+    prefix: 'FUND_',
     menu: '譲渡益税明細',
     label: '投資信託',
-    required: false,
+    need: 'optional',
     what: '投資信託の損益',
-    why: '投信をやっていなければ不要です',
+    why: '投信をやっていなければ不要です。NISA口座の分もここに入ります。一度取り込めば残ります',
     file: 'FUND_20260802023729.csv のような名前',
   },
-] as const
+]
+
+const NEED_LABEL: Record<Need, string> = {
+  required: '必須',
+  either: 'どちらか一方',
+  optional: '該当すれば',
+}
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -140,10 +182,15 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
   const [editingUrl, setEditingUrl] = useState(false)
 
   /** 種類ごとに、最後に取り込んだ日時を履歴から探す */
-  const lastOf = (prefix: string): string | null => {
-    const hit = logs.find((l) => l.fileName.startsWith(prefix))
+  const lastOf = (k: FileKind): string | null => {
+    const hit = logs.find((l) =>
+      k.format ? l.format === k.format : k.prefix ? l.fileName.startsWith(k.prefix) : false,
+    )
     return hit ? hit.at : null
   }
+
+  // 「どちらか一方」の組は、片方でも入っていれば足りている
+  const eitherSatisfied = FILE_KINDS.filter((k) => k.need === 'either').some((k) => lastOf(k) !== null)
 
   return (
     <Card title="取り込み手順" desc="忘れてもここを見れば分かるようにしてあります">
@@ -214,70 +261,104 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
             下のバックアップを定期的に書き出しておいてください。
           </div>
 
-          <div className="note" style={{ marginTop: 10, lineHeight: 1.8 }}>
-            <b style={{ color: 'var(--ink-2)' }}>補足：</b>
-            「特定口座損益明細」（<code>SaveFile_</code> で始まるが中身が損益明細のもの）を落とせば、
-            現物と信用の損益が1ファイルにまとまっているので、下の「譲渡益税明細（国内株式）」の代わりになります。
-            商品指定を切り替える手間が省けます。両方入れても二重計上はしません。
-          </div>
-
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-            {FILE_KINDS.map((k) => {
-              const last = lastOf(k.key)
+            {FILE_KINDS.map((k, i) => {
+              const last = lastOf(k)
+              // 「どちらか一方」は、組のどれかが入っていれば足りているので警告しない
+              const missing = last === null && (k.need === 'required' || (k.need === 'either' && !eitherSatisfied))
+              const firstOfEither = k.need === 'either' && FILE_KINDS.findIndex((x) => x.need === 'either') === i
               return (
-                <div
-                  key={k.key}
-                  style={{
-                    padding: '11px 13px',
-                    borderRadius: 10,
-                    background: 'var(--plane)',
-                    border: `1px solid ${last ? 'var(--border)' : k.required ? 'color-mix(in srgb, var(--series-2) 45%, transparent)' : 'var(--border)'}`,
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        padding: '2px 8px',
-                        borderRadius: 6,
-                        background: 'var(--surface-raised)',
-                        border: '1px solid var(--border-strong)',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {k.menu}
-                    </span>
-                    <b style={{ fontSize: 13, color: 'var(--ink)' }}>{k.label}</b>
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        padding: '1px 7px',
-                        borderRadius: 999,
-                        background: k.required
-                          ? 'color-mix(in srgb, var(--neg) 16%, transparent)'
-                          : 'color-mix(in srgb, var(--ink) 8%, transparent)',
-                        color: k.required ? 'var(--neg)' : 'var(--ink-muted)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {k.required ? '必須' : '該当すれば'}
-                    </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: last ? 'var(--ink-muted)' : 'var(--series-2)' }}>
-                      {last ? `最終取込 ${new Date(last).toLocaleDateString('ja-JP')}` : 'まだ取り込んでいません'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>{k.what}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-muted)', marginTop: 3 }}>{k.why}</div>
+                <div key={k.id}>
+                  {firstOfEither && (
+                    <div style={{ fontSize: 12, color: 'var(--ink-2)', margin: '8px 0 8px', fontWeight: 600 }}>
+                      損益のファイルは、次の2つのうち<b style={{ color: 'var(--ink)' }}>どちらか一方</b>で足ります
+                      {eitherSatisfied && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--pos)', fontWeight: 600 }}>取り込み済み</span>
+                      )}
+                    </div>
+                  )}
                   <div
                     style={{
-                      fontSize: 11,
-                      color: 'var(--ink-muted)',
-                      marginTop: 5,
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      padding: '11px 13px',
+                      borderRadius: 10,
+                      background: 'var(--plane)',
+                      border: `1px solid ${
+                        missing ? 'color-mix(in srgb, var(--series-2) 45%, transparent)' : 'var(--border)'
+                      }`,
+                      marginLeft: k.need === 'either' ? 12 : 0,
+                      opacity: k.need === 'either' && !k.recommended && eitherSatisfied && last === null ? 0.55 : 1,
                     }}
                   >
-                    {k.file}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: 'var(--surface-raised)',
+                          border: '1px solid var(--border-strong)',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {k.menu}
+                      </span>
+                      <b style={{ fontSize: 13, color: 'var(--ink)' }}>{k.label}</b>
+                      {k.recommended && (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            padding: '1px 7px',
+                            borderRadius: 999,
+                            background: 'color-mix(in srgb, var(--pos) 18%, transparent)',
+                            color: 'var(--pos)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          こちらが楽
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          padding: '1px 7px',
+                          borderRadius: 999,
+                          background:
+                            k.need === 'required'
+                              ? 'color-mix(in srgb, var(--neg) 16%, transparent)'
+                              : 'color-mix(in srgb, var(--ink) 8%, transparent)',
+                          color: k.need === 'required' ? 'var(--neg)' : 'var(--ink-muted)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {NEED_LABEL[k.need]}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: 11,
+                          color: last ? 'var(--ink-muted)' : missing ? 'var(--series-2)' : 'var(--ink-muted)',
+                        }}
+                      >
+                        {last
+                          ? `最終取込 ${new Date(last).toLocaleDateString('ja-JP')}`
+                          : k.need === 'either' && eitherSatisfied
+                            ? '使っていません（不要）'
+                            : 'まだ取り込んでいません'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>{k.what}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-muted)', marginTop: 3 }}>{k.why}</div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--ink-muted)',
+                        marginTop: 5,
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      }}
+                    >
+                      {k.file}
+                    </div>
                   </div>
                 </div>
               )
