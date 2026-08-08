@@ -20,10 +20,18 @@ const KEY = {
   folder: 'trade-journal.folder-note',
 } as const
 
-/** 落とすべきCSVの種類。判別はファイル名の接頭辞で行う */
+/**
+ * 落とすべきCSVの種類。判別はファイル名の接頭辞で行う。
+ *
+ * SBIのメニュー名は、実際のCSVの中身から特定したもの。
+ * ・SaveFile_ は2行目に「約定履歴照会」と書かれている → 取引履歴
+ * ・DOMESTIC_STOCK_ はヘッダーに 種類=現物 の行を持つ。決済明細は信用取引の
+ *   決済を出す画面なので現物は現れない → 譲渡損益
+ */
 const FILE_KINDS = [
   {
     key: 'SaveFile_',
+    menu: '取引履歴',
     label: '約定履歴照会',
     required: true,
     what: '全取引（新規建て・返済の両方）が入った主データ',
@@ -32,15 +40,17 @@ const FILE_KINDS = [
   },
   {
     key: 'DOMESTIC_STOCK_',
-    label: '実現損益（国内株式）',
+    menu: '譲渡損益',
+    label: '国内株式',
     required: true,
     what: '現物取引の損益',
-    why: '約定履歴には現物の損益が入っていないため、これが無いと損益が0で集計されます',
+    why: '約定履歴には現物の損益が入っていないため、これが無いと損益が0で集計されます。「現物」と「信用」でフィルタが分かれている場合、必要なのは現物の方です（信用は取引履歴と重複しますが、入れても害はありません）',
     file: 'DOMESTIC_STOCK_20260802023656.csv のような名前',
   },
   {
     key: 'FOREIGN_STOCK_',
-    label: '実現損益（米国株式）',
+    menu: '譲渡損益',
+    label: '米国株式',
     required: false,
     what: '米国株の損益',
     why: '米国株は約定履歴に一切現れないため、これが唯一のデータ源です',
@@ -48,7 +58,8 @@ const FILE_KINDS = [
   },
   {
     key: 'FUND_',
-    label: '実現損益（投資信託）',
+    menu: '譲渡損益',
+    label: '投資信託',
     required: false,
     what: '投資信託の損益',
     why: '投信をやっていなければ不要です',
@@ -178,8 +189,10 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
           />
         </Step>
 
-        <Step n={2} title="下の2〜4種類のCSVを落とす（期間は毎回「全期間」でOK）">
-          <div style={{ display: 'grid', gap: 10, marginTop: 4 }}>
+        <Step n={2} title="Myメニューの「損益/履歴」から落とす（期間は毎回「全期間」でOK）">
+          使うのは <b style={{ color: 'var(--ink)' }}>取引履歴</b> と <b style={{ color: 'var(--ink)' }}>譲渡損益</b> の2つです。
+          <b>決済明細は不要</b>です（信用の決済損益は取引履歴の方に入っており、実データで1円まで一致することを確認済み）。
+          <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
             {FILE_KINDS.map((k) => {
               const last = lastOf(k.key)
               return (
@@ -193,6 +206,19 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
                   }}
                 >
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background: 'var(--surface-raised)',
+                        border: '1px solid var(--border-strong)',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {k.menu}
+                    </span>
                     <b style={{ fontSize: 13, color: 'var(--ink)' }}>{k.label}</b>
                     <span
                       style={{
