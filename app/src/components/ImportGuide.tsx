@@ -23,15 +23,13 @@ const KEY = {
 /**
  * 落とすべきCSVの種類。判別はファイル名の接頭辞で行う。
  *
- * SBIのメニュー名は、実際のCSVの中身から特定したもの。
- * ・SaveFile_ は2行目に「約定履歴照会」と書かれている → 取引履歴
- * ・DOMESTIC_STOCK_ はヘッダーに 種類=現物 の行を持つ。決済明細は信用取引の
- *   決済を出す画面なので現物は現れない → 譲渡損益
+ * バッジは「取引履歴」ボタンを押した先に並ぶタブ名
+ * （約定履歴 / 信用決済明細 / 譲渡益税明細 / カバードワラント損益）に対応する。
  */
 const FILE_KINDS = [
   {
     key: 'SaveFile_',
-    menu: '取引履歴',
+    menu: '約定履歴',
     label: '約定履歴照会',
     required: true,
     what: '全取引（新規建て・返済の両方）が入った主データ',
@@ -40,7 +38,7 @@ const FILE_KINDS = [
   },
   {
     key: 'DOMESTIC_STOCK_',
-    menu: '譲渡損益',
+    menu: '譲渡益税明細',
     label: '国内株式',
     required: true,
     what: '現物取引の損益',
@@ -49,7 +47,7 @@ const FILE_KINDS = [
   },
   {
     key: 'FOREIGN_STOCK_',
-    menu: '譲渡損益',
+    menu: '譲渡益税明細',
     label: '米国株式',
     required: false,
     what: '米国株の損益',
@@ -58,7 +56,7 @@ const FILE_KINDS = [
   },
   {
     key: 'FUND_',
-    menu: '譲渡損益',
+    menu: '譲渡益税明細',
     label: '投資信託',
     required: false,
     what: '投資信託の損益',
@@ -189,10 +187,34 @@ export function ImportGuide({ logs }: { logs: ImportLog[] }) {
           />
         </Step>
 
-        <Step n={2} title="Myメニューの「損益/履歴」から落とす（期間は毎回「全期間」でOK）">
-          使うのは <b style={{ color: 'var(--ink)' }}>取引履歴</b> と <b style={{ color: 'var(--ink)' }}>譲渡損益</b> の2つです。
-          <b>決済明細は不要</b>です（信用の決済損益は取引履歴の方に入っており、実データで1円まで一致することを確認済み）。
-          <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+        <Step n={2} title="「取引履歴」を開き、2つのタブから落とす">
+          「取引履歴」を押すと <b style={{ color: 'var(--ink)' }}>約定履歴 / 信用決済明細 / 譲渡益税明細 / カバードワラント損益</b> のタブが並びます。
+          使うのは <b style={{ color: 'var(--ink)' }}>約定履歴</b> と <b style={{ color: 'var(--ink)' }}>譲渡益税明細</b> の2つだけです。
+          <br />
+          <b>信用決済明細は不要</b>です。信用の決済損益は約定履歴の方に入っており、実データで1円まで一致することを確認済みです。
+
+          <div
+            style={{
+              marginTop: 12,
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: 'color-mix(in srgb, var(--series-2) 12%, var(--surface))',
+              border: '1px solid color-mix(in srgb, var(--series-2) 45%, transparent)',
+              fontSize: 12.5,
+              lineHeight: 1.8,
+            }}
+          >
+            <b>約定日の開始を必ず遡ってください。</b>
+            初期値は直近1ヶ月分になっています。そのまま照会すると1ヶ月分しか落ちません。
+            「約定日」の左側の年月日を、遡れるところまで（口座開設日、または2年前）に変えてから照会します。
+            <br />
+            <br />
+            <b>SBIで遡れるのは過去2年までです。</b>
+            それより古い履歴はSBIから取り直せません。<b>このアプリのバックアップ（JSON）が唯一の保全手段になります。</b>
+            下のバックアップを定期的に書き出しておいてください。
+          </div>
+
+          <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             {FILE_KINDS.map((k) => {
               const last = lastOf(k.key)
               return (
