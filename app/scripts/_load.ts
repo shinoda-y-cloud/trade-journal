@@ -7,7 +7,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { mergeRealizedPnl, parseSbiFile } from '../src/lib/sbi/parse'
+import { dedupeExecutions, mergeRealizedPnl, parseSbiFile } from '../src/lib/sbi/parse'
 import { buildPositions } from '../src/lib/sbi/positions'
 import type { Execution, Position, RealizedRow } from '../src/lib/sbi/types'
 
@@ -24,8 +24,10 @@ export function loadAll(dir = join(import.meta.dirname, '../../sample-data')): {
     executions.push(...r.executions)
     realized.push(...r.realized)
   }
-  mergeRealizedPnl(executions, realized)
-  return { executions, realized, positions: buildPositions(executions).positions }
+  // 期間の重なるファイルを同時に読んでも壊れないよう、マージ前に重複を潰す
+  const unique = dedupeExecutions(executions)
+  mergeRealizedPnl(unique, realized)
+  return { executions: unique, realized, positions: buildPositions(unique).positions }
 }
 
 /** 決済日の曜日（0=月 … 6=日） */

@@ -8,7 +8,7 @@ import {
   saveExecutions,
   type ImportLog,
 } from '../lib/db'
-import { mergeRealizedPnl, parseSbiFile } from '../lib/sbi/parse'
+import { dedupeExecutions, mergeRealizedPnl, parseSbiFile } from '../lib/sbi/parse'
 import type { Execution, RealizedRow } from '../lib/sbi/types'
 import { Card, Footnote, Tile } from '../components/ui'
 import { ImportGuide } from '../components/ImportGuide'
@@ -75,12 +75,23 @@ export function DataView({
         return
       }
 
+      // 期間の重なる約定履歴を同時に選んでも壊れないよう、マージ前に重複を潰す
+      const unique = dedupeExecutions(executions)
+      if (unique.length < executions.length) {
+        lines.push(`選んだファイル間で重複していた約定 ${executions.length - unique.length}件をまとめました`)
+      }
+      executions.length = 0
+      executions.push(...unique)
+
       const { merged, synthesized } = mergeRealizedPnl(executions, realized)
       if (merged > 0) lines.push(`実現損益を${merged}件の決済に突き合わせました`)
       if (synthesized.length > 0) lines.push(`約定履歴に無い決済を${synthesized.length}件補完しました`)
 
       const res = await saveExecutions(executions)
       lines.push(`保存：新規${res.added}件 / 既存と重複${res.duplicated}件`)
+      if (res.preserved > 0) {
+        lines.push(`  （うち${res.preserved}件は、既に取り込んである損益をそのまま残しました）`)
+      }
 
       for (const p of parsed) {
         await addImportLog({

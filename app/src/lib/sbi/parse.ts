@@ -214,6 +214,37 @@ export function parseRealizedPnl(rows: string[][]): {
 }
 
 /* ------------------------------------------------------------------ */
+/* 重複排除                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 同じIDの約定をまとめる。
+ *
+ * 期間の重なる約定履歴を2本同時に選ぶと、同じ約定が2件ずつ現れる。
+ * この状態で mergeRealizedPnl を通すと、実現損益は片方にしか当たらず、
+ * あとで重複排除したときに「損益が入っていない方」が残ることがある。
+ * そのため、マージより前に必ずここを通す。
+ *
+ * 損益や平均取得価額が入っている方を優先して残す。
+ */
+export function dedupeExecutions(executions: Execution[]): Execution[] {
+  const byId = new Map<string, Execution>()
+  for (const e of executions) {
+    const prev = byId.get(e.id)
+    if (!prev) {
+      byId.set(e.id, e)
+      continue
+    }
+    byId.set(e.id, {
+      ...prev,
+      realizedPnl: prev.realizedPnl ?? e.realizedPnl,
+      avgCost: prev.avgCost ?? e.avgCost,
+    })
+  }
+  return [...byId.values()]
+}
+
+/* ------------------------------------------------------------------ */
 /* マージ                                                              */
 /* ------------------------------------------------------------------ */
 

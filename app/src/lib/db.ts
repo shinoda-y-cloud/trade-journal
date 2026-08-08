@@ -65,24 +65,36 @@ export async function loadExecutions(): Promise<Execution[]> {
 /**
  * 約定を保存する。IDは内容から決まるため、同じCSVを何度取り込んでも重複しない。
  * 追加できた件数と、既存と重複した件数を返す。
+ *
+ * 既に判明している実現損益を、あとから来た「損益なし」のレコードで
+ * 上書きしないようにしている。約定履歴だけを再取込したときに、
+ * 以前マージした現物・投信の損益が消えるのを防ぐため。
  */
 export async function saveExecutions(
   executions: Execution[],
-): Promise<{ added: number; duplicated: number }> {
+): Promise<{ added: number; duplicated: number; preserved: number }> {
   const d = await db()
   const tx = d.transaction('executions', 'readwrite')
   let added = 0
   let duplicated = 0
-  await Promise.all(
-    executions.map(async (e) => {
-      const existing = await tx.store.get(e.id)
-      if (existing) duplicated++
-      else added++
+  let preserved = 0
+  for (const e of executions) {
+    const existing = await tx.store.get(e.id)
+    if (existing) {
+      duplicated++
+      if (e.realizedPnl === null && existing.realizedPnl !== null) preserved++
+      await tx.store.put({
+        ...e,
+        realizedPnl: e.realizedPnl ?? existing.realizedPnl,
+        avgCost: e.avgCost ?? existing.avgCost,
+      })
+    } else {
+      added++
       await tx.store.put(e)
-    }),
-  )
+    }
+  }
   await tx.done
-  return { added, duplicated }
+  return { added, duplicated, preserved }
 }
 
 export async function addImportLog(log: Omit<ImportLog, 'id'>): Promise<void> {
