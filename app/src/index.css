@@ -567,3 +567,59 @@ table.data tbody tr:hover td {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------------ */
+/* 入力フォーム                                                        */
+/* ------------------------------------------------------------------ */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 860px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.form-grid label > span {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.form-grid input,
+.form-grid select {
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--plane);
+  color: var(--ink);
+  min-width: 0;
+  width: 100%;
+  /* iOSで入力時に画面が拡大されないよう16px相当を確保する */
+  font-size: max(14px, 1rem);
+}
+.form-grid input:focus,
+.form-grid select:focus {
+  outline: 2px solid color-mix(in srgb, var(--pos) 55%, transparent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.form-grid input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.6;
+}

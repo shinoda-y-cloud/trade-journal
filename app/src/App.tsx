@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { buildPositions } from './lib/sbi/positions'
-import { loadExecutions, loadImportLogs, type ImportLog } from './lib/db'
+import { loadExecutions, loadImportLogs, loadPlans, type ImportLog } from './lib/db'
 import type { Execution } from './lib/sbi/types'
 import { dataRange, filterByRange, type DateRange } from './lib/analytics'
 import { Dashboard } from './views/Dashboard'
 import { SymbolsView } from './views/SymbolsView'
 import { AnalysisView } from './views/AnalysisView'
 import { DataView } from './views/DataView'
+import { PlanView } from './views/PlanView'
+import type { TradePlan } from './lib/plans'
 import { PnlCalendar } from './components/PnlCalendar'
 import { Card, Segmented } from './components/ui'
 
-type Tab = 'dashboard' | 'calendar' | 'symbols' | 'analysis' | 'data'
+type Tab = 'dashboard' | 'calendar' | 'plans' | 'symbols' | 'analysis' | 'data'
 
 interface TabMeta {
   id: Tab
@@ -47,6 +49,17 @@ const TABS: TabMeta[] = [
       <svg width="17" height="17" viewBox="0 0 24 24" {...stroke}>
         <rect x="3" y="5" width="18" height="16" rx="2" />
         <path d="M3 10h18M8 3v4M16 3v4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'plans',
+    label: 'プラン',
+    desc: 'エントリー前に意図を記録し、結果と突き合わせる',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" {...stroke}>
+        <path d="M8 4h9a2 2 0 012 2v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7" />
+        <path d="M8 2v4M9 12h6M9 16h4" />
       </svg>
     ),
   },
@@ -107,12 +120,14 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [executions, setExecutions] = useState<Execution[] | null>(null)
   const [logs, setLogs] = useState<ImportLog[]>([])
+  const [plans, setPlans] = useState<TradePlan[]>([])
   const [rangeKey, setRangeKey] = useState<RangeKey>('all')
 
   const reload = useCallback(async () => {
-    const [ex, lg] = await Promise.all([loadExecutions(), loadImportLogs()])
+    const [ex, lg, pl] = await Promise.all([loadExecutions(), loadImportLogs(), loadPlans()])
     setExecutions(ex)
     setLogs(lg)
+    setPlans(pl)
   }, [])
 
   useEffect(() => {
@@ -134,9 +149,9 @@ export default function App() {
 
   const hasData = allPositions.length > 0
   // データが無いうちは取り込み画面に固定する
-  const active: Tab = executions !== null && !hasData ? 'data' : tab
+  const active: Tab = executions !== null && !hasData && tab !== 'plans' ? 'data' : tab
   const meta = TABS.find((t) => t.id === active)!
-  const showRange = hasData && active !== 'data' && active !== 'calendar'
+  const showRange = hasData && active !== 'data' && active !== 'calendar' && active !== 'plans'
 
   return (
     <div className="shell">
@@ -206,6 +221,8 @@ export default function App() {
           <Card>
             <PnlCalendar positions={allPositions} />
           </Card>
+        ) : active === 'plans' ? (
+          <PlanView plans={plans} positions={allPositions} onChanged={reload} />
         ) : active === 'symbols' ? (
           <SymbolsView positions={positions} />
         ) : (

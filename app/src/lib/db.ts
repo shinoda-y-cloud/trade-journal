@@ -6,9 +6,10 @@
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Execution } from './sbi/types'
+import type { TradePlan } from './plans'
 
 const DB_NAME = 'trade-journal'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 interface Schema extends DBSchema {
   executions: {
@@ -19,6 +20,12 @@ interface Schema extends DBSchema {
   imports: {
     key: number
     value: ImportLog
+  }
+  /** 事前に記録したトレードプラン */
+  plans: {
+    key: string
+    value: TradePlan
+    indexes: { date: string }
   }
 }
 
@@ -36,10 +43,16 @@ let dbPromise: Promise<IDBPDatabase<Schema>> | null = null
 
 function db() {
   dbPromise ??= openDB<Schema>(DB_NAME, DB_VERSION, {
-    upgrade(d) {
-      const store = d.createObjectStore('executions', { keyPath: 'id' })
-      store.createIndex('date', 'date')
-      d.createObjectStore('imports', { keyPath: 'id', autoIncrement: true })
+    upgrade(d, oldVersion) {
+      if (oldVersion < 1) {
+        const store = d.createObjectStore('executions', { keyPath: 'id' })
+        store.createIndex('date', 'date')
+        d.createObjectStore('imports', { keyPath: 'id', autoIncrement: true })
+      }
+      if (oldVersion < 2) {
+        const plans = d.createObjectStore('plans', { keyPath: 'id' })
+        plans.createIndex('date', 'date')
+      }
     },
   })
   return dbPromise
@@ -80,10 +93,33 @@ export async function loadImportLogs(): Promise<ImportLog[]> {
   return (await (await db()).getAll('imports')).reverse()
 }
 
+/* ------------------------------------------------------------------ */
+/* トレードプラン                                                      */
+/* ------------------------------------------------------------------ */
+
+export async function loadPlans(): Promise<TradePlan[]> {
+  return (await db()).getAll('plans')
+}
+
+export async function savePlan(plan: TradePlan): Promise<void> {
+  await (await db()).put('plans', plan)
+}
+
+export async function deletePlan(id: string): Promise<void> {
+  await (await db()).delete('plans', id)
+}
+
+/* ------------------------------------------------------------------ */
+
 export async function clearAll(): Promise<void> {
   const d = await db()
   await d.clear('executions')
   await d.clear('imports')
+}
+
+/** プランだけを消す。取引データには触れない */
+export async function clearPlans(): Promise<void> {
+  await (await db()).clear('plans')
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,6 +131,8 @@ export interface Backup {
   version: number
   exportedAt: string
   executions: Execution[]
+  /** v2以降。古いバックアップには入っていない */
+  plans?: TradePlan[]
 }
 
 export async function exportBackup(): Promise<Backup> {
@@ -103,6 +141,7 @@ export async function exportBackup(): Promise<Backup> {
     version: DB_VERSION,
     exportedAt: new Date().toISOString(),
     executions: await loadExecutions(),
+    plans: await loadPlans(),
   }
 }
 
@@ -111,6 +150,12 @@ export async function importBackup(json: unknown): Promise<{ added: number; dupl
   const b = json as Partial<Backup>
   if (b?.app !== 'trade-journal' || !Array.isArray(b.executions)) {
     throw new Error('このアプリのバックアップファイルではありません')
+  }
+  if (Array.isArray(b.plans)) {
+    const d = await db()
+    const tx = d.transaction('plans', 'readwrite')
+    await Promise.all(b.plans.map((p) => tx.store.put(p)))
+    await tx.done
   }
   return saveExecutions(b.executions)
 }
