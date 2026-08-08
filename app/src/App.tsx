@@ -144,6 +144,12 @@ export default function App() {
     [allPositions, rangeKey, full],
   )
 
+  // 取り込み済みデータの中で最も新しい約定日。更新の目安に使う
+  const latestTradeDate = useMemo(
+    () => (executions && executions.length ? executions.reduce((m, e) => (e.date > m ? e.date : m), executions[0].date) : null),
+    [executions],
+  )
+
   // 損益不明の建玉。約定履歴CSVだけを取り込むと現物・投信がここに落ちる
   const unknownPnl = useMemo(() => allPositions.filter((p) => !p.pnlKnown), [allPositions])
 
@@ -213,7 +219,12 @@ export default function App() {
                 </p>
               </div>
             )}
-            <DataView logs={logs} executionCount={executions.length} onChanged={reload} />
+            <DataView
+              logs={logs}
+              executionCount={executions.length}
+              latestTradeDate={latestTradeDate}
+              onChanged={reload}
+            />
           </>
         ) : active === 'dashboard' ? (
           <Dashboard positions={positions} />

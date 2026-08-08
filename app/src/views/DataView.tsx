@@ -10,7 +10,11 @@ import {
 } from '../lib/db'
 import { mergeRealizedPnl, parseSbiFile } from '../lib/sbi/parse'
 import type { Execution, RealizedRow } from '../lib/sbi/types'
-import { Card, Footnote } from '../components/ui'
+import { Card, Footnote, Tile } from '../components/ui'
+import { longDate } from '../lib/format'
+
+/** SBIのダウンロードページ。初回に本人が貼って、次回から1タップで開けるようにする */
+const SBI_URL_KEY = 'trade-journal.sbi-url'
 
 const FORMAT_LABEL: Record<string, string> = {
   execution_history: '約定履歴照会',
@@ -26,12 +30,24 @@ interface Report {
 export function DataView({
   logs,
   executionCount,
+  latestTradeDate,
   onChanged,
 }: {
   logs: ImportLog[]
   executionCount: number
+  /** 取り込み済みデータの中で最も新しい約定日 */
+  latestTradeDate: string | null
   onChanged: () => void
 }) {
+  const [sbiUrl, setSbiUrl] = useState(() => localStorage.getItem(SBI_URL_KEY) ?? '')
+  const [editingUrl, setEditingUrl] = useState(false)
+
+  // 最新の約定日から何日経ったか。取り込みの目安にする
+  const staleDays =
+    latestTradeDate === null
+      ? null
+      : Math.floor((Date.now() - Date.parse(`${latestTradeDate}T00:00:00`)) / 86_400_000)
+  const lastImport = logs[0]?.at ?? null
   const csvInput = useRef<HTMLInputElement>(null)
   const jsonInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -107,6 +123,79 @@ export function DataView({
 
   return (
     <div className="grid" style={{ gap: 14 }}>
+      {executionCount > 0 && (
+        <>
+          <div className="grid cols-3">
+            <Tile
+              label="取り込み済みの最新約定日"
+              value={latestTradeDate ? latestTradeDate.slice(5).replace('-', '/') : '—'}
+              sub={latestTradeDate ? longDate(latestTradeDate) : undefined}
+            />
+            <Tile
+              label="そこからの経過"
+              value={staleDays === null ? '—' : `${staleDays}日`}
+              tone={staleDays === null ? undefined : staleDays > 45 ? 'neg' : staleDays > 20 ? undefined : 'pos'}
+              sub={staleDays !== null && staleDays > 45 ? '入れ直しどきです' : '月1回で十分です'}
+            />
+            <Tile
+              label="最後に取り込んだ日時"
+              value={lastImport ? new Date(lastImport).toLocaleDateString('ja-JP') : '—'}
+              sub={lastImport ? new Date(lastImport).toLocaleTimeString('ja-JP') : undefined}
+            />
+          </div>
+
+          <Card title="更新のしかた" desc="毎日やる必要はありません">
+            <div className="note" style={{ lineHeight: 1.9 }}>
+              <b style={{ color: 'var(--ink)' }}>期間は毎回「全期間」で構いません。</b>
+              同じ約定を二度取り込んでも重複しない仕組みなので、前回どこまで入れたかを覚えておく必要はありません。
+              落としたCSVをそのまま全部選べば、増えた分だけが足されます。
+              <br />
+              <br />
+              1日分が増えても集計はほとんど動かないので、<b style={{ color: 'var(--ink)' }}>月1回</b>で足ります。
+              日々記録するのは「プラン」の方で、CSVは後から答え合わせに使います。
+            </div>
+
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--grid)' }}>
+              <div className="note" style={{ marginBottom: 10 }}>
+                SBIのダウンロード画面のURLを一度貼っておくと、次回から1タップで開けます。
+              </div>
+              {editingUrl || !sbiUrl ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    className="url-input"
+                    value={sbiUrl}
+                    placeholder="https://site1.sbisec.co.jp/... （ブラウザからコピーして貼る）"
+                    onChange={(e) => setSbiUrl(e.target.value)}
+                  />
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      localStorage.setItem(SBI_URL_KEY, sbiUrl.trim())
+                      setEditingUrl(false)
+                    }}
+                  >
+                    保存
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <a className="btn" href={sbiUrl} target="_blank" rel="noreferrer noopener">
+                    SBIのダウンロード画面を開く
+                  </a>
+                  <button className="btn" style={{ padding: '7px 12px', fontSize: 12 }} onClick={() => setEditingUrl(true)}>
+                    URLを変更
+                  </button>
+                </div>
+              )}
+              <Footnote>
+                URLはこの端末にだけ保存されます。ログイン情報は保存しません。
+                証券口座の認証を代行する仕組みは、このアプリには入れていません。
+              </Footnote>
+            </div>
+          </Card>
+        </>
+      )}
+
       <Card title="CSVを取り込む" desc="SBI証券からダウンロードしたCSVをそのまま読み込めます">
         <input
           ref={csvInput}
