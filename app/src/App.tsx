@@ -11,7 +11,7 @@ import { PlanView } from './views/PlanView'
 import type { TradePlan } from './lib/plans'
 import { PnlCalendar } from './components/PnlCalendar'
 import { DocFrame } from './components/DocFrame'
-import { Card, Segmented } from './components/ui'
+import { Card, Segmented, ThemeSwitch } from './components/ui'
 
 type Tab = 'dashboard' | 'calendar' | 'plans' | 'symbols' | 'analysis' | 'data' | 'method'
 
@@ -184,9 +184,12 @@ export default function App() {
             {t.label}
           </button>
         ))}
-        <p className="note" style={{ marginTop: 'auto', padding: '0 12px', fontSize: 11 }}>
-          データはこの端末内にのみ保存されます
-        </p>
+        <div style={{ marginTop: 'auto', padding: '0 12px' }}>
+          <ThemeSwitch compact />
+          <p className="note" style={{ margin: '12px 0 0', fontSize: 11 }}>
+            データはこの端末内にのみ保存されます
+          </p>
+        </div>
       </nav>
 
       <main className="main">

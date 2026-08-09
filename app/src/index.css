@@ -4,99 +4,111 @@
  * ライト／ダークはそれぞれ独立に選定した値で、単純な反転ではない。
  */
 
-:root {
+/*
+ * テーマは3種類。白基調 / 紺基調 / 黒基調。
+ * どれを選んでも文字は面に対して4.5:1以上、グラフや境界は3:1以上を満たすよう
+ * 実測して選んである（scripts/check-contrast.mjs で検証できる）。
+ *
+ * 既定値は白基調。起動時に index.html のインラインスクリプトが
+ * 保存済みの選択（無ければOSの設定）を data-theme に載せるので、
+ * 描画前にテーマが確定し、切り替わりのちらつきが出ない。
+ */
+
+:root,
+:root[data-theme='light'] {
   color-scheme: light;
 
-  /* 面 */
-  --plane: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-raised: #ffffff;
+  --plane: #f4f4f2;
+  --surface: #ffffff;
+  --surface-raised: #f7f7f5;
 
-  /* 文字 */
   --ink: #0b0b0b;
   --ink-2: #52514e;
-  --ink-muted: #898781;
+  --ink-muted: #6d6b66;
 
-  /* 罫線 */
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --border-strong: rgba(11, 11, 11, 0.18);
+  --grid: #e4e3dd;
+  --axis: #bfbeb6;
+  --border: rgba(11, 11, 11, 0.12);
+  --border-strong: rgba(11, 11, 11, 0.2);
 
-  /* 損益の極性（diverging: 青↔赤、中点はグレー）
-     日本の会計慣行に合わせ、損失=赤／利益=青 */
+  /* 損益の極性。日本の会計慣行に合わせ、利益=青 / 損失=赤 */
   --pos: #2a78d6;
-  --neg: #e34948;
-  --neutral: #f0efec;
+  --neg: #d63b3a;
+  --neutral: #ececeb;
 
-  /* カテゴリ（検証済みの並び順。循環させない） */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-
-  /* ヒートマップ（単一色相 light→dark） */
-  --seq-1: #cde2fb;
-  --seq-2: #86b6ef;
-  --seq-3: #3987e5;
-  --seq-4: #1c5cab;
-  --seq-5: #0d366b;
+  /* 極性を持たない量（標準偏差・発生率など）に使う */
+  --series-2: #c2521f;
 
   --radius: 14px;
   --radius-sm: 9px;
-
   --font: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --plane: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-raised: #232322;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --ink-muted: #898781;
-    --grid: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.18);
-    --pos: #3987e5;
-    --neg: #e66767;
-    --neutral: #383835;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --seq-1: #0d366b;
-    --seq-2: #184f95;
-    --seq-3: #256abf;
-    --seq-4: #3987e5;
-    --seq-5: #86b6ef;
-  }
+:root[data-theme='navy'] {
+  color-scheme: dark;
+
+  --plane: #101927;
+  --surface: #16202f;
+  --surface-raised: #1d2a3d;
+
+  --ink: #eef3fa;
+  --ink-2: #b3c2d6;
+  --ink-muted: #8598ae;
+
+  --grid: #26344a;
+  --axis: #35455e;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --pos: #5aa9f8;
+  --neg: #f4807e;
+  --neutral: #24314a;
+
+  --series-2: #f0854c;
 }
 
-:root[data-theme='dark'] {
+:root[data-theme='black'] {
   color-scheme: dark;
-  --plane: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-raised: #232322;
+
+  --plane: #000000;
+  --surface: #0f0f0f;
+  --surface-raised: #1a1a1a;
+
   --ink: #ffffff;
   --ink-2: #c3c2b7;
-  --ink-muted: #898781;
-  --grid: #2c2c2a;
-  --axis: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --pos: #3987e5;
-  --neg: #e66767;
-  --neutral: #383835;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --seq-1: #0d366b;
-  --seq-2: #184f95;
-  --seq-3: #256abf;
-  --seq-4: #3987e5;
-  --seq-5: #86b6ef;
+  --ink-muted: #9a978f;
+
+  --grid: #262626;
+  --axis: #3a3a38;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.24);
+
+  --pos: #4d94ea;
+  --neg: #ef7a7a;
+  --neutral: #262626;
+
+  --series-2: #e0672f;
+}
+
+/* JSが走る前の一瞬だけ、OSの設定に合わせておく */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --plane: #000000;
+    --surface: #0f0f0f;
+    --surface-raised: #1a1a1a;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-muted: #9a978f;
+    --grid: #262626;
+    --axis: #3a3a38;
+    --border: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.24);
+    --pos: #4d94ea;
+    --neg: #ef7a7a;
+    --neutral: #262626;
+    --series-2: #e0672f;
+  }
 }
 
 * {
@@ -660,7 +672,7 @@ a.btn {
   min-height: 460px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #0b0f14;
+  background: var(--plane);
   overflow: hidden;
 }
 /* 中身の高さに合わせたので、スクロールはページ側だけになる */
@@ -674,4 +686,57 @@ a.btn {
   .doc-frame.is-sized {
     height: auto;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* テーマ切り替え                                                      */
+/* ------------------------------------------------------------------ */
+
+.theme-switch {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.theme-switch button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 550;
+  padding: 6px 11px;
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.theme-switch button[aria-pressed='true'] {
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.theme-switch .swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  flex: none;
+  border: 1px solid var(--border-strong);
+}
+/* 見本の色はテーマに追従させず、その配色そのものを示す */
+.swatch-light { background: #ffffff; }
+.swatch-navy { background: #16202f; }
+.swatch-black { background: #000000; }
+
+.theme-switch.compact button {
+  padding: 5px 8px;
+  font-size: 11.5px;
+  gap: 5px;
+}
+.theme-switch.compact .swatch {
+  width: 11px;
+  height: 11px;
 }

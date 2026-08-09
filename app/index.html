@@ -14,8 +14,23 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Trade Journal" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f9f7" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d0d" />
+    <meta name="theme-color" content="#f4f4f2" />
+
+    <!-- 描画前にテーマを確定させ、切り替わりのちらつきを防ぐ -->
+    <script>
+      (function () {
+        try {
+          var k = 'trade-journal.theme'
+          var v = localStorage.getItem(k)
+          if (v !== 'light' && v !== 'navy' && v !== 'black') {
+            v = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'black' : 'light'
+          }
+          document.documentElement.dataset.theme = v
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

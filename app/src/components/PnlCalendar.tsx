@@ -74,13 +74,14 @@ export function PnlCalendar({ positions }: { positions: Position[] }) {
   /**
    * 損益の絶対値から塗りの濃さを決める。中点はセル背景そのもの。
    * 4段階に量子化して、わずかな差が濃淡として過剰に読まれないようにする。
-   * 最濃を72%に留めてあるのは、その上に載る文字（常に --ink）が
-   * ライト・ダークどちらでもコントラスト比4.5:1を確保できる上限のため。
+   * 最濃を55%に留めてあるのは、その上に載る文字（常に --ink）が
+   * 白・紺・黒のどのテーマでもコントラスト比4.5:1を確保できる上限のため。
+   * 紺基調は利益色が明るいので、ここが最も厳しい制約になる。
    */
   const fill = (pnl: number | null) => {
     if (pnl === null || pnl === 0) return 'transparent'
     const t = Math.min(Math.abs(pnl) / span, 1)
-    const step = [20, 38, 55, 72][Math.min(Math.floor(t * 4), 3)]
+    const step = [16, 29, 42, 55][Math.min(Math.floor(t * 4), 3)]
     return `color-mix(in srgb, ${pnl > 0 ? 'var(--pos)' : 'var(--neg)'} ${step}%, var(--surface))`
   }
 

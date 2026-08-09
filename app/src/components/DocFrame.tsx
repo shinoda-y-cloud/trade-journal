@@ -6,6 +6,9 @@
  * それに合わせて iframe 自体を伸ばし、スクロールはページ側だけにする。
  *
  * 測れなかった場合（別オリジンなど）は、CSS側の固定高にそのまま落ちる。
+ *
+ * 配色も親と揃える。中身は同じ data-theme を見て色を切り替えるので、
+ * 属性を写すだけでテーマが一致する。
  */
 import { useEffect, useRef, useState } from 'react'
 
@@ -30,7 +33,19 @@ export function DocFrame({ src, title }: { src: string; title: string }) {
       }
     }
 
+    // 親のテーマを中身に写す
+    const syncTheme = () => {
+      try {
+        const doc = el.contentDocument
+        if (!doc?.documentElement) return
+        doc.documentElement.dataset.theme = document.documentElement.dataset.theme ?? 'light'
+      } catch {
+        /* 読めない場合は中身の既定配色のまま */
+      }
+    }
+
     const onLoad = () => {
+      syncTheme()
       measure()
       try {
         const body = el.contentDocument?.body
@@ -47,10 +62,15 @@ export function DocFrame({ src, title }: { src: string; title: string }) {
     if (el.contentDocument?.readyState === 'complete') onLoad()
     window.addEventListener('resize', measure)
 
+    // テーマ切り替えに追従する
+    const themeWatcher = new MutationObserver(syncTheme)
+    themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
     return () => {
       el.removeEventListener('load', onLoad)
       window.removeEventListener('resize', measure)
       observer?.disconnect()
+      themeWatcher.disconnect()
     }
   }, [])
 

@@ -5,10 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>デイトレ マルチタイムフレーム設計書</title>
 <style>
-  :root{
-    --bg:#0b0f14; --panel:#121821; --panel2:#161e29; --line:#243040;
-    --tx:#e6edf5; --tx2:#9fb0c4; --tx3:#6b7d92;
-    --up:#22c55e; --down:#ef4444; --key:#38bdf8; --warn:#f59e0b; --gold:#eab308;
+  /* アプリ本体と同じ3テーマ。data-theme は親フレームが同期する。
+     どの配色でも本文4.5:1以上、アクセント3:1以上を実測で満たしている */
+  :root,
+  :root[data-theme="light"]{
+    --bg:#f4f4f2; --panel:#ffffff; --panel2:#f7f7f5; --line:#e4e3dd;
+    --tx:#0b0b0b; --tx2:#52514e; --tx3:#6d6b66;
+    --up:#1a7f37; --down:#d63b3a; --key:#2a78d6; --warn:#c2521f; --gold:#8a6d00;
+  }
+  :root[data-theme="navy"]{
+    --bg:#101927; --panel:#16202f; --panel2:#1d2a3d; --line:#26344a;
+    --tx:#eef3fa; --tx2:#b3c2d6; --tx3:#8598ae;
+    --up:#4ec97a; --down:#f4807e; --key:#5aa9f8; --warn:#f0854c; --gold:#e0b341;
+  }
+  :root[data-theme="black"]{
+    --bg:#000000; --panel:#0f0f0f; --panel2:#1a1a1a; --line:#262626;
+    --tx:#ffffff; --tx2:#c3c2b7; --tx3:#9a978f;
+    --up:#3fb950; --down:#ef7a7a; --key:#4d94ea; --warn:#e0672f; --gold:#d3a017;
   }
   *{box-sizing:border-box}
   body{
@@ -20,7 +33,7 @@
   header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:32px}
   h1{font-size:26px;font-weight:800;letter-spacing:.02em;margin:0 0 6px}
   .sub{color:var(--tx2);font-size:13px}
-  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:#0e2a3a;color:var(--key);border:1px solid #17455e;margin-left:8px;vertical-align:middle}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--key) 14%,var(--panel));color:var(--key);border:1px solid color-mix(in srgb,var(--key) 40%,transparent);margin-left:8px;vertical-align:middle}
   h2{font-size:17px;font-weight:700;margin:44px 0 6px;display:flex;align-items:center;gap:10px}
   h2::before{content:"";width:4px;height:18px;background:var(--key);border-radius:2px;display:inline-block}
   .lead{color:var(--tx2);font-size:13px;margin:0 0 14px}
@@ -30,20 +43,20 @@
     background:var(--panel2);color:var(--tx2);font-weight:700;font-size:11.5px;
     letter-spacing:.06em;text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;
   }
-  tbody td{padding:12px;border-bottom:1px solid #1b2431;vertical-align:top}
+  tbody td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}
   tbody tr:last-child td{border-bottom:none}
-  tbody tr:hover{background:#151d28}
+  tbody tr:hover{background:color-mix(in srgb,var(--tx) 5%,transparent)}
   .tf{font-weight:800;font-size:15px;white-space:nowrap}
   .tf small{display:block;font-weight:400;font-size:10.5px;color:var(--tx3);letter-spacing:.04em}
   .num{font-variant-numeric:tabular-nums;white-space:nowrap}
   .pri{font-size:12px;white-space:nowrap;font-weight:700}
   .p3{color:var(--up)} .p2{color:var(--gold)} .p1{color:var(--tx3)} .px{color:var(--down)}
-  .row-x td{opacity:.62;background:#14101200}
-  .chip{display:inline-block;font-size:11px;padding:1.5px 7px;border-radius:5px;background:#1b2534;color:var(--tx2);border:1px solid #26344a;margin:2px 3px 2px 0;white-space:nowrap}
-  .chip.k{background:#0d2836;color:var(--key);border-color:#16455c}
-  .chip.g{background:#0f2a1c;color:var(--up);border-color:#1c4a32}
-  .chip.r{background:#2b1416;color:#fca5a5;border-color:#5a2226}
-  .note{background:#141b25;border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:14px 16px;font-size:12.5px;color:var(--tx2);margin-top:14px}
+  .row-x td{opacity:.62}
+  .chip{display:inline-block;font-size:11px;padding:1.5px 7px;border-radius:5px;background:color-mix(in srgb,var(--tx) 7%,var(--panel));color:var(--tx2);border:1px solid var(--line);margin:2px 3px 2px 0;white-space:nowrap}
+  .chip.k{background:color-mix(in srgb,var(--key) 13%,var(--panel));color:var(--key);border-color:color-mix(in srgb,var(--key) 38%,transparent)}
+  .chip.g{background:color-mix(in srgb,var(--up) 13%,var(--panel));color:var(--up);border-color:color-mix(in srgb,var(--up) 38%,transparent)}
+  .chip.r{background:color-mix(in srgb,var(--down) 13%,var(--panel));color:var(--down);border-color:color-mix(in srgb,var(--down) 38%,transparent)}
+  .note{background:color-mix(in srgb,var(--tx) 4%,var(--panel));border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:14px 16px;font-size:12.5px;color:var(--tx2);margin-top:14px}
   .note b{color:var(--tx)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:820px){.grid2{grid-template-columns:1fr}}
@@ -56,7 +69,7 @@
   .step .t{font-size:16px;font-weight:800;margin:3px 0 6px;color:var(--key)}
   .step .d{font-size:12px;color:var(--tx2)}
   ul.ck{list-style:none;padding:0;margin:0;font-size:12.5px}
-  ul.ck li{padding:7px 0 7px 24px;position:relative;border-bottom:1px dashed #1e2836;color:var(--tx2)}
+  ul.ck li{padding:7px 0 7px 24px;position:relative;border-bottom:1px dashed var(--line);color:var(--tx2)}
   ul.ck li:last-child{border-bottom:none}
   ul.ck li::before{content:"☐";position:absolute;left:4px;top:6px;color:var(--key);font-size:13px}
   ul.ng li::before{content:"✕";color:var(--down)}
@@ -107,7 +120,7 @@
     tbody td:first-child{
       display:block;
       padding:2px 14px 8px;
-      border-bottom:1px dashed #1e2836;
+      border-bottom:1px dashed var(--line);
       margin-bottom:6px;
     }
     tbody td:first-child::before{display:none}
@@ -135,14 +148,14 @@
 <p class="lead">「日足で方向、60分足で場所、15分足で当日の型、5分足で引き金」。これ以上増やすと判断が遅れ、これ以下だと根拠が薄くなる。</p>
 
 <div class="flow">
-  <div class="step"><div class="n">STEP 1 / 環境認識</div><div class="t">日足</div><div class="d">上か下か。買っていい日か、休む日か。<br><b style="color:#e6edf5">前夜に確定</b></div></div>
-  <div class="step"><div class="n">STEP 2 / 位置決め</div><div class="t">60分足</div><div class="d">押し目・戻りの帯はどこか。SL を置く構造線はどこか。<br><b style="color:#e6edf5">8:30〜8:50</b></div></div>
-  <div class="step"><div class="n">STEP 3 / 当日判断</div><div class="t">15分足</div><div class="d">寄りの方向は日足と一致しているか。ゾーンに来たか。<br><b style="color:#e6edf5">9:00〜</b></div></div>
-  <div class="step"><div class="n">STEP 4 / 執行</div><div class="t">5分足</div><div class="d">VWAP・EMA・パターンで IN / OUT。<br><b style="color:#e6edf5">ザラ場中</b></div></div>
+  <div class="step"><div class="n">STEP 1 / 環境認識</div><div class="t">日足</div><div class="d">上か下か。買っていい日か、休む日か。<br><b style="color:var(--tx)">前夜に確定</b></div></div>
+  <div class="step"><div class="n">STEP 2 / 位置決め</div><div class="t">60分足</div><div class="d">押し目・戻りの帯はどこか。SL を置く構造線はどこか。<br><b style="color:var(--tx)">8:30〜8:50</b></div></div>
+  <div class="step"><div class="n">STEP 3 / 当日判断</div><div class="t">15分足</div><div class="d">寄りの方向は日足と一致しているか。ゾーンに来たか。<br><b style="color:var(--tx)">9:00〜</b></div></div>
+  <div class="step"><div class="n">STEP 4 / 執行</div><div class="t">5分足</div><div class="d">VWAP・EMA・パターンで IN / OUT。<br><b style="color:var(--tx)">ザラ場中</b></div></div>
 </div>
 
 <h2>時間足別 早見表</h2>
-<p class="lead">「表示期間」は画面に出す横軸の長さ。カッコ内の本数が実際にチャートに並ぶローソクの数で、<b style="color:#e6edf5">どの足も 100〜200本</b>が形（トレンド・レンジ・パターン）を最も認識しやすいゾーン。</p>
+<p class="lead">「表示期間」は画面に出す横軸の長さ。カッコ内の本数が実際にチャートに並ぶローソクの数で、<b style="color:var(--tx)">どの足も 100〜200本</b>が形（トレンド・レンジ・パターン）を最も認識しやすいゾーン。</p>
 
 <div class="card">
 <table>

@@ -5,7 +5,7 @@
  *   import { loadAll } from './_load'
  *   const { positions, executions } = loadAll()
  */
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { dedupeExecutions, mergeRealizedPnl, parseSbiFile } from '../src/lib/sbi/parse'
 import { buildPositions } from '../src/lib/sbi/positions'
@@ -16,6 +16,13 @@ export function loadAll(dir = join(import.meta.dirname, '../../sample-data')): {
   realized: RealizedRow[]
   positions: Position[]
 } {
+  if (!existsSync(dir)) {
+    console.error(`検証用のCSVが見つかりません: ${dir}`)
+    console.error('SBI証券から落としたCSVをこのフォルダに置いてから実行してください。')
+    console.error('（取引データはリポジトリに含めない方針のため、手元にしか存在しません）')
+    process.exit(2)
+  }
+
   const executions: Execution[] = []
   const realized: RealizedRow[] = []
   for (const f of readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.csv')).sort()) {

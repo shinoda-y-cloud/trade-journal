@@ -1,5 +1,6 @@
 /** 画面をまたいで使う小さな部品 */
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { applyTheme, currentTheme, THEMES, type Theme } from '../lib/theme'
 import {
   avgLoss,
   avgWin,
@@ -158,3 +159,36 @@ export function Footnote({ children }: { children: ReactNode }) {
 }
 
 export type StatsLike = Stats
+
+/* ------------------------------------------------------------------ */
+/* テーマ切り替え                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 白 / 紺 / 黒 の切り替え。
+ * 選択は localStorage に保存され、次回起動時は index.html の
+ * インラインスクリプトが描画前に適用する。
+ */
+export function ThemeSwitch({ compact = false }: { compact?: boolean }) {
+  const [theme, setTheme] = useState<Theme>(() => currentTheme())
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  return (
+    <div className={`theme-switch${compact ? ' compact' : ''}`} role="group" aria-label="配色テーマ">
+      {THEMES.map((t) => (
+        <button
+          key={t.value}
+          aria-pressed={t.value === theme}
+          onClick={() => setTheme(t.value)}
+          title={`${t.label}基調`}
+        >
+          <span className={`swatch swatch-${t.value}`} aria-hidden="true" />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}

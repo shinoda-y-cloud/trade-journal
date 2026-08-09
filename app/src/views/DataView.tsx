@@ -10,7 +10,7 @@ import {
 } from '../lib/db'
 import { dedupeExecutions, mergeRealizedPnl, parseSbiFile } from '../lib/sbi/parse'
 import type { Execution, RealizedRow } from '../lib/sbi/types'
-import { Card, Footnote, Tile } from '../components/ui'
+import { Card, Footnote, ThemeSwitch, Tile } from '../components/ui'
 import { ImportGuide } from '../components/ImportGuide'
 import { longDate } from '../lib/format'
 
@@ -156,6 +156,14 @@ export function DataView({
 
         </>
       )}
+
+      <Card title="配色" desc="画面全体の基調色を選べます。手法タブの資料も一緒に切り替わります">
+        <ThemeSwitch />
+        <Footnote>
+          どの配色でも、文字は背景に対してコントラスト比4.5:1以上、グラフや境界線は3:1以上を
+          満たすように色を選んであります。選択はこの端末に保存され、次回の起動時も維持されます。
+        </Footnote>
+      </Card>
 
       <ImportGuide logs={logs} />
 
