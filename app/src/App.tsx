@@ -12,7 +12,7 @@ import type { TradePlan } from './lib/plans'
 import { PnlCalendar } from './components/PnlCalendar'
 import { Card, Segmented } from './components/ui'
 
-type Tab = 'dashboard' | 'calendar' | 'plans' | 'symbols' | 'analysis' | 'data'
+type Tab = 'dashboard' | 'calendar' | 'plans' | 'symbols' | 'analysis' | 'data' | 'method'
 
 interface TabMeta {
   id: Tab
@@ -95,6 +95,17 @@ const TABS: TabMeta[] = [
       </svg>
     ),
   },
+  {
+    id: 'method',
+    label: '手法',
+    desc: 'デイトレ用マルチタイムフレーム設計書',
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" {...stroke}>
+        <path d="M4 19V5a2 2 0 012-2h11l3 3v13a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+        <path d="M8 8h6M8 12h8M8 16h5" />
+      </svg>
+    ),
+  },
 ]
 
 /** 期間の絞り込み。データの末尾から遡る */
@@ -155,9 +166,9 @@ export default function App() {
 
   const hasData = allPositions.length > 0
   // データが無いうちは取り込み画面に固定する
-  const active: Tab = executions !== null && !hasData && tab !== 'plans' ? 'data' : tab
+  const active: Tab = executions !== null && !hasData && tab !== 'plans' && tab !== 'method' ? 'data' : tab
   const meta = TABS.find((t) => t.id === active)!
-  const showRange = hasData && active !== 'data' && active !== 'calendar' && active !== 'plans'
+  const showRange = hasData && active !== 'data' && active !== 'calendar' && active !== 'plans' && active !== 'method'
 
   return (
     <div className="shell">
@@ -232,6 +243,13 @@ export default function App() {
           <Card>
             <PnlCalendar positions={allPositions} />
           </Card>
+        ) : active === 'method' ? (
+          // 単一ファイルで完結したHTMLをそのまま表示する。SPA側には展開しない
+          <iframe
+            className="doc-frame"
+            src={`${import.meta.env.BASE_URL}timeframe.html`}
+            title="デイトレ用マルチタイムフレーム設計書"
+          />
         ) : active === 'plans' ? (
           <PlanView plans={plans} positions={allPositions} onChanged={reload} />
         ) : active === 'symbols' ? (

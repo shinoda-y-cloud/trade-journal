@@ -260,13 +260,17 @@ button {
     flex-direction: column;
     align-items: center;
     gap: 3px;
-    padding: 6px 2px;
+    padding: 6px 1px;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--ink-muted);
-    font-size: 10px;
+    /* タブが増えても折り返さないよう、少し詰める */
+    font-size: 9.5px;
+    letter-spacing: -0.03em;
     font-weight: 600;
+    white-space: nowrap;
+    min-width: 0;
   }
   .tabbar button[aria-current='true'] {
     color: var(--ink);
@@ -638,4 +642,27 @@ table.data tbody tr:hover td {
 a.btn {
   display: inline-block;
   text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* 外部HTMLの埋め込み（手法）                                          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * 単一ファイルで完結したHTMLをそのまま表示する枠。
+ * 中身は独自の配色を持つので、アプリのテーマは適用しない。
+ */
+.doc-frame {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - 200px);
+  min-height: 460px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0b0f14;
+}
+@media (max-width: 860px) {
+  .doc-frame {
+    height: calc(100dvh - 230px - env(safe-area-inset-bottom));
+  }
 }

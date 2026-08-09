@@ -196,4 +196,18 @@ app/src/lib/
   format.ts          表示整形
 app/src/components/  グラフ・カレンダー・共通UI
 app/src/views/       画面
+app/public/
+  timeframe.html     デイトレ用マルチタイムフレーム設計書（単一HTML）
 ```
+
+## 手法タブ
+
+`app/public/timeframe.html` を iframe でそのまま表示しています。SPA側には展開せず、
+単一ファイルのまま置いてあるので、差し替えたいときはこのファイルを上書きするだけです。
+
+元ファイルから1行だけ削っています。`<script src="...tailwind.min.css">` という
+CSSをscriptで読む記述で、スタイルとして適用されないうえPWAのオフライン起動を壊すためです
+（実際の配色はすべて同ファイル内の `<style>` にあり、Tailwindのクラスは使われていません）。
+
+Service Worker のプリキャッシュ対象に含めてあり、`navigateFallbackDenylist` で
+SPAのindex.htmlに差し替えられないようにしています。

@@ -31,6 +31,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
+        // iframe読み込みもナビゲーション扱いになるため、SPAのindex.htmlに
+        // 差し替えられないよう除外する
+        navigateFallbackDenylist: [/timeframe\.html$/],
       },
     }),
   ],
