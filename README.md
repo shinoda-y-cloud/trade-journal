@@ -101,7 +101,8 @@ npm run build --prefix app     # dist/ に本番ビルド
 node app/scripts/make-icons.mjs # アイコン再生成
 ```
 
-実データに対する検算スクリプト（いずれも `../sample-data` を読む）。
+実データに対する検算スクリプト（いずれもリポジトリ直下の `csv-data/` を読む）。
+そこにSBIから落としたCSVを置いてください。取引データはコミットされません。
 
 ```bash
 npx tsx app/scripts/check-parser.ts    # CSV解析と建玉突合の検算

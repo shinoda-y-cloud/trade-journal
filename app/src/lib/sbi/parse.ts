@@ -227,11 +227,16 @@ export function parseRealizedPnl(rows: string[][]): {
 /* 3. 特定口座損益明細                                                  */
 /* ------------------------------------------------------------------ */
 
-/** 「現物売」「信用返済売」「信用返済買」→ 内部表現 */
-const SETTLEMENT_KIND_MAP: Record<string, { kind: TradeKind; side: Side }> = {
-  現物売: { kind: 'cash', side: 'long' },
-  信用返済売: { kind: 'margin', side: 'long' },
-  信用返済買: { kind: 'margin', side: 'short' },
+/** 特定口座損益明細の「取引」欄 → 内部表現 */
+const SETTLEMENT_KIND_MAP: Record<
+  string,
+  { kind: TradeKind; side: Side; assetClass: AssetClass }
+> = {
+  現物売: { kind: 'cash', side: 'long', assetClass: 'domestic_stock' },
+  信用返済売: { kind: 'margin', side: 'long', assetClass: 'domestic_stock' },
+  信用返済買: { kind: 'margin', side: 'short', assetClass: 'domestic_stock' },
+  国内投信解約: { kind: 'fund', side: 'long', assetClass: 'fund' },
+  外国株式売: { kind: 'cash', side: 'long', assetClass: 'us_stock' },
 }
 
 /**
@@ -278,12 +283,15 @@ export function parseSettlementDetail(rows: string[][]): {
     // 損益が「--」の行は同値決済（±0）。読み飛ばすと決済が1件欠ける
     const pnl = toNumberOr0(get(r, '損益金額/徴収額'))
 
+    // 投信と外国株には銘柄コードが振られていないので、銘柄名をコード代わりに使う。
+    // 全角スペースを半角に揃えて、他形式のCSVと表記を一致させる
+    const name = get(r, '銘柄').replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim()
     realized.push({
       date,
       account: '特定',
-      code: get(r, '銘柄コード'),
-      name: get(r, '銘柄'),
-      assetClass: 'domestic_stock',
+      code: get(r, '銘柄コード') || name,
+      name,
+      assetClass: mapped.assetClass,
       kind: mapped.kind,
       side: mapped.side,
       rawKind,
@@ -352,26 +360,59 @@ export function mergeRealizedPnl(
   executions: Execution[],
   realized: RealizedRow[],
 ): { merged: number; synthesized: Execution[]; duplicated: number; unmatched: RealizedRow[] } {
-  const pool = new Map<string, RealizedRow[]>()
-  for (const r of realized) {
-    // 信用返済の損益は約定履歴側が正。突合対象から外す
-    if (r.kind === 'margin') continue
-    const k = joinKey(r.date, r.code, r.quantity, r.price)
-    const list = pool.get(k)
-    if (list) list.push(r)
-    else pool.set(k, [r])
+  // 信用返済の損益は約定履歴側が正。突合対象から外す
+  const targets = realized.filter((r) => r.kind !== 'margin')
+
+  const index = (key: (r: RealizedRow) => string) => {
+    const m = new Map<string, RealizedRow[]>()
+    for (const r of targets) {
+      const k = key(r)
+      const list = m.get(k)
+      if (list) list.push(r)
+      else m.set(k, [r])
+    }
+    return m
   }
 
+  // 同じ行を2度使わないよう、消費済みを共有で持つ
+  const used = new Set<RealizedRow>()
+  const take = (m: Map<string, RealizedRow[]>, k: string): RealizedRow | null => {
+    const list = m.get(k)
+    if (!list) return null
+    while (list.length > 0) {
+      const r = list.shift()!
+      if (!used.has(r)) {
+        used.add(r)
+        return r
+      }
+    }
+    return null
+  }
+
+  const exact = index((r) => joinKey(r.date, r.code, r.quantity, r.price))
+  // 単価を見ないゆるいキー。投資信託は形式によって単価の意味が違い
+  // （基準価額と解約額単価）、日・銘柄・数量は揃うのに単価だけ一致しない。
+  // 同じ日・同じ銘柄・同じ数量なら同一の決済とみなす。
+  const loose = index((r) => `${r.date}|${r.code}|${r.quantity}`)
+
   let merged = 0
-  for (const ex of executions) {
-    if (ex.action !== 'close' || ex.realizedPnl !== null) continue
-    const k = joinKey(ex.date, ex.code, ex.quantity, ex.price)
-    const list = pool.get(k)
-    if (!list || list.length === 0) continue
-    const row = list.shift()!
+  const apply = (ex: Execution, row: RealizedRow) => {
     ex.realizedPnl = row.realizedPnl
     ex.avgCost = row.avgCost
     merged++
+  }
+
+  const pending: Execution[] = []
+  for (const ex of executions) {
+    if (ex.action !== 'close' || ex.realizedPnl !== null) continue
+    const row = take(exact, joinKey(ex.date, ex.code, ex.quantity, ex.price))
+    if (row) apply(ex, row)
+    else pending.push(ex)
+  }
+  // 完全一致で埋まらなかったものだけを、ゆるいキーで再度突合する
+  for (const ex of pending) {
+    const row = take(loose, `${ex.date}|${ex.code}|${ex.quantity}`)
+    if (row) apply(ex, row)
   }
 
   // 残った行のうち、その日・その銘柄の決済約定が約定履歴に一切無いものだけを合成する。
@@ -380,11 +421,22 @@ export function mergeRealizedPnl(
   const closedDayCode = new Set(
     executions.filter((e) => e.action === 'close').map((e) => `${e.date}|${e.code}`),
   )
-  const leftover = [...pool.values()].flat()
+  const leftover = targets.filter((r) => !used.has(r))
   const duplicated = leftover.filter((r) => closedDayCode.has(`${r.date}|${r.code}`))
+  // 合成対象も、銘柄コードを除いた中身で重複を落とす。
+  // 米国株は約定履歴に一切現れないため、実現損益CSVと特定口座損益明細の
+  // 両方を選ぶと同じ決済が2件合成されてしまう。両者は銘柄コードの表記が
+  // 違う（SOFI と 銘柄名）ので、コードを使わないキーで判定する。
   const seq = new Map<string, number>()
+  const seenSynth = new Set<string>()
   const synthesized = leftover
     .filter((r) => !closedDayCode.has(`${r.date}|${r.code}`))
+    .filter((r) => {
+      const k = `${r.date}|${r.assetClass}|${r.quantity}|${r.realizedPnl}`
+      if (seenSynth.has(k)) return false
+      seenSynth.add(k)
+      return true
+    })
     .map((r) => {
       const base = joinKey(r.date, r.code, r.quantity, r.price)
       const n = (seq.get(base) ?? 0) + 1

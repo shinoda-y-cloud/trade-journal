@@ -1,5 +1,5 @@
 /**
- * 開発用：sample-data の実CSVを読み込んで建玉まで組み立てる共通ローダー。
+ * 開発用：csv-data の実CSVを読み込んで建玉まで組み立てる共通ローダー。
  * 分析スクリプトはこれを import して使う。
  *
  *   import { loadAll } from './_load'
@@ -11,7 +11,7 @@ import { dedupeExecutions, mergeRealizedPnl, parseSbiFile } from '../src/lib/sbi
 import { buildPositions } from '../src/lib/sbi/positions'
 import type { Execution, Position, RealizedRow } from '../src/lib/sbi/types'
 
-export function loadAll(dir = join(import.meta.dirname, '../../sample-data')): {
+export function loadAll(dir = join(import.meta.dirname, '../../csv-data')): {
   executions: Execution[]
   realized: RealizedRow[]
   positions: Position[]

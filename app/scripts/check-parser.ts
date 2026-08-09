@@ -2,14 +2,14 @@
  * 実データに対してパーサを検証する開発用スクリプト。
  *   npx tsx scripts/check-parser.ts
  *
- * SBIのCSVそのものはリポジトリに含めない。sample-data/ から読む。
+ * SBIのCSVそのものはリポジトリに含めない。csv-data/ から読む。
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { mergeRealizedPnl, parseSbiFile } from '../src/lib/sbi/parse'
 import type { Execution, RealizedRow } from '../src/lib/sbi/types'
 
-const DIR = join(import.meta.dirname, '../../sample-data')
+const DIR = join(import.meta.dirname, '../../csv-data')
 const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`
 
 const executions: Execution[] = []
@@ -69,7 +69,8 @@ console.log(`生成された建玉: ${positions.length}`)
 console.log(`新規建てが見つからない決済: ${orphanCloses.length}  (損益 ${yen(orphanCloses.reduce((s, e) => s + (e.realizedPnl ?? 0), 0))})`)
 console.log(`期末に残った未決済建玉: ${openLots.length}`)
 const posPnl = positions.reduce((s, p) => s + p.realizedPnl, 0)
-console.log(`建玉ベースの損益合計: ${yen(Math.round(posPnl))}  ← 決済ベースとの差 ${yen(Math.round(posPnl + orphanCloses.reduce((s, e) => s + (e.realizedPnl ?? 0), 0) - total))}`)
+// 孤児決済も positions に含まれているので、単純に総額どうしを比べる
+console.log(`建玉ベースの損益合計: ${yen(Math.round(posPnl))}  ← 決済ベースとの差 ${yen(Math.round(posPnl - total))}`)
 
 console.log('\n=== 保有期間別の成績 ===')
 const bk = new Map<string, { n: number; pnl: number; win: number }>()

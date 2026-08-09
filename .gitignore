@@ -1,4 +1,5 @@
 # SBI証券からダウンロードした取引データ。絶対にコミットしない
+csv-data/
 sample-data/
 *.csv
 *.CSV
