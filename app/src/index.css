@@ -655,14 +655,23 @@ a.btn {
 .doc-frame {
   display: block;
   width: 100%;
+  /* 高さを測れるまでの暫定値。測れたら is-sized で内容の高さに置き換わる */
   height: calc(100dvh - 200px);
   min-height: 460px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: #0b0f14;
+  overflow: hidden;
+}
+/* 中身の高さに合わせたので、スクロールはページ側だけになる */
+.doc-frame.is-sized {
+  min-height: 0;
 }
 @media (max-width: 860px) {
   .doc-frame {
     height: calc(100dvh - 230px - env(safe-area-inset-bottom));
+  }
+  .doc-frame.is-sized {
+    height: auto;
   }
 }

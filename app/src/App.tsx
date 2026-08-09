@@ -10,6 +10,7 @@ import { DataView } from './views/DataView'
 import { PlanView } from './views/PlanView'
 import type { TradePlan } from './lib/plans'
 import { PnlCalendar } from './components/PnlCalendar'
+import { DocFrame } from './components/DocFrame'
 import { Card, Segmented } from './components/ui'
 
 type Tab = 'dashboard' | 'calendar' | 'plans' | 'symbols' | 'analysis' | 'data' | 'method'
@@ -245,8 +246,7 @@ export default function App() {
           </Card>
         ) : active === 'method' ? (
           // 単一ファイルで完結したHTMLをそのまま表示する。SPA側には展開しない
-          <iframe
-            className="doc-frame"
+          <DocFrame
             src={`${import.meta.env.BASE_URL}timeframe.html`}
             title="デイトレ用マルチタイムフレーム設計書"
           />

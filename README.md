@@ -211,3 +211,10 @@ CSSをscriptで読む記述で、スタイルとして適用されないうえPW
 
 Service Worker のプリキャッシュ対象に含めてあり、`navigateFallbackDenylist` で
 SPAのindex.htmlに差し替えられないようにしています。
+
+**スマホ対応として、820px以下で6列テーブルを縦積みカードに切り替えています。**
+各 `<td>` に `data-label` を付け、`::before` で見出しを出す方式です。
+820px超の見た目は元のまま変わりません。
+
+`DocFrame` が中身の高さを測って iframe を伸ばすため、スクロールはページ側だけになります
+（iframe内とページで二重にスクロールしない）。
